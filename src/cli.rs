@@ -9,15 +9,15 @@ pub struct Cli {
     pub command: Commands,
     
     /// Output file path
-    #[arg(short, long, default_value = "output.tif")]
+    #[arg(short, long, default_value = "output.tif", global = true)]
     pub output: PathBuf,
     
     /// Use float32 instead of int16
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub float: bool,
     
     /// Scaling factor for fixed-point
-    #[arg(long, default_value = "10000")]
+    #[arg(long, default_value = "10000", global = true)]
     pub scale_factor: i32,
 }
 

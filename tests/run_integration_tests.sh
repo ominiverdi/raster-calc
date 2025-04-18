@@ -3,6 +3,9 @@
 
 set -e
 
+# tell GDAL to be maximally verbose
+export CPL_DEBUG=ON
+
 echo "Running raster-calc integration tests..."
 
 # Build latest version

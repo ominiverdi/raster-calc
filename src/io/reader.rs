@@ -1,6 +1,6 @@
 // src/io/reader.rs
-use anyhow::{Context, Result};
-use gdal::{Dataset, Metadata};
+use anyhow::Result;
+use gdal::Dataset;
 use gdal::raster::Buffer;
 use rayon::prelude::*;
 use std::path::Path;
@@ -22,7 +22,7 @@ pub fn read_bands_parallel(band_paths: &[&Path]) -> Result<(Vec<((usize, usize),
     let geo_transform = first_ds.geo_transform()?;
     
     // Get optimal chunk size based on cache line size and CPU count
-    let num_cpus = std::thread::available_parallelism()?.get();
+    let _num_cpus = std::thread::available_parallelism()?.get();
     let chunk_size = 2048;  // Optimal based on benchmarks
     let chunks_x = (width as usize + chunk_size - 1) / chunk_size;
     let chunks_y = (height as usize + chunk_size - 1) / chunk_size;
