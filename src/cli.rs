@@ -48,4 +48,18 @@ pub enum Commands {
         #[arg(short = 'c', long)]
         blue: PathBuf,
     },
+    /// Soil Adjusted Vegetation Index
+    Savi {
+        /// NIR band (A)
+        #[arg(short = 'a', long)]
+        nir: PathBuf,
+        
+        /// Red band (B)
+        #[arg(short = 'b', long)]
+        red: PathBuf,
+        
+        /// Soil adjustment factor (default: 0.5)
+        #[arg(short = 'l', long, default_value = "0.5")]
+        soil_factor: f32,
+    },
 }
