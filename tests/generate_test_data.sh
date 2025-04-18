@@ -12,7 +12,7 @@ SIZE=256
 
 # Create template raster using gdal_create
 echo "Creating synthetic rasters..."
-gdal_create -of GTiff -outsize $SIZE $SIZE -bands 1 -ot Float32 ../data/template.tif
+gdal_create -of GTiff -outsize $SIZE $SIZE -bands 1 -ot Float32 -a_srs EPSG:4326 -a_ullr 0 0 1 1 ../data/template.tif
 
 # Use gdal_calc with simple calculations and overwrite flag
 gdal_calc.py --calc="5000" --outfile=../data/nir.tif -A ../data/template.tif --NoDataValue=0 --type=Float32 --overwrite
