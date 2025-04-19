@@ -108,7 +108,7 @@ Lorenzo Becchi
 
 ## Acknowledgments
 
-Special thanks to GrayShade for contributions and optimizations.
+Special thanks to [GrayShade/lnicola](https://github.com/lnicola) for contributions and optimizations.
 
 ## License
 
