@@ -7,7 +7,7 @@ mod utils;
 mod processing;
 
 use crate::cli::{Cli, Commands};
-use crate::processing::{ParallelProcessor, indices::{NDI, EVI, SAVI}};
+use crate::processing::{ParallelProcessor, indices::{NDI, EVI, SAVI, NDWI}};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -51,6 +51,21 @@ fn main() -> Result<()> {
                 &[
                     nir.to_string_lossy().to_string(),
                     red.to_string_lossy().to_string()
+                ],
+                cli.output.to_string_lossy().as_ref(),
+                !cli.float,
+                cli.scale_factor,
+            )?;
+        },
+        Commands::Ndwi { green, nir } => {
+            // Create NDWI calculator with Green and NIR bands
+            let ndwi = NDWI::new(0, 1, None);
+            
+            processor.process(
+                ndwi,
+                &[
+                    green.to_string_lossy().to_string(),
+                    nir.to_string_lossy().to_string()
                 ],
                 cli.output.to_string_lossy().as_ref(),
                 !cli.float,
