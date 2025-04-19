@@ -5,7 +5,7 @@ use gdal::{
     raster::{Buffer, GdalDataType, RasterBand},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TypedBuffer {
     U8(Buffer<u8>),
     I8(Buffer<i8>),

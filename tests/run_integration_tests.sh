@@ -46,6 +46,8 @@ echo "All tests completed successfully!"
 
 
 ## local test
+# raster-calc ndi -a <first_band> -b <second_band> -o <output>
+
 echo "Testing with float output:"
 time ../target/release/raster-calc ndi \
   -a ../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2 \
