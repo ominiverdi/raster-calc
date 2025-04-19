@@ -1,6 +1,6 @@
 // tests/unit_tests.rs
 use gdal::raster::Buffer;
-use raster_calc::processing::indices::{NDI, EVI, SAVI, NDWI};
+use raster_calc::processing::indices::{NDI, EVI, SAVI, NDWI, BSI, NDSI};
 use raster_calc::processing::parallel::IndexCalculator;
 use raster_calc::utils::gdal_ext::TypedBuffer;
 
@@ -273,6 +273,94 @@ fn test_ndwi_calculation() {
     
     // Verify results
     for (i, (_, _, expected)) in test_cases.iter().enumerate() {
+        if *expected == -999.0 {
+            assert_eq!(result_values[i], -999.0);
+        } else {
+            assert!((result_values[i] - expected).abs() < 0.01, 
+                "Expected {}, got {} at index {}", expected, result_values[i], i);
+        }
+    }
+}
+
+#[test]
+fn test_ndsi_calculation() {
+    // Test data pairs (GREEN, SWIR)
+    // NDSI = (GREEN - SWIR) / (GREEN + SWIR)
+    let test_cases = [
+        // GREEN, SWIR, Expected NDSI
+        (3000.0, 1000.0, 0.5),   // (3000-1000)/(3000+1000) = 0.5
+        (2000.0, 2000.0, 0.0),   // (2000-2000)/(2000+2000) = 0
+        (1000.0, 3000.0, -0.5),  // (1000-3000)/(1000+3000) = -0.5
+        (0.0, 0.0, -999.0),      // Special case - divide by zero
+    ];
+    
+    // Create test data
+    let green_values: Vec<f32> = test_cases.iter().map(|(green, _, _)| *green).collect();
+    let swir_values: Vec<f32> = test_cases.iter().map(|(_, swir, _)| *swir).collect();
+    let inputs = create_test_data(2, 2, &green_values, &swir_values, None);
+    
+    // Create NDSI calculator (indices 0 and 1 for GREEN and SWIR)
+    let ndsi = NDSI::new(0, 1, None);
+    
+    // Calculate NDSI
+    let result = ndsi.calculate(&inputs);
+    let result_values = get_results(&result);
+    
+    // Verify results
+    for (i, (_, _, expected)) in test_cases.iter().enumerate() {
+        if *expected == -999.0 {
+            assert_eq!(result_values[i], -999.0);
+        } else {
+            assert!((result_values[i] - expected).abs() < 0.01, 
+                "Expected {}, got {} at index {}", expected, result_values[i], i);
+        }
+    }
+}
+
+#[test]
+fn test_bsi_calculation() {
+    // Test data (SWIR, RED, NIR, BLUE)
+    // BSI = ((SWIR + RED) - (NIR + BLUE)) / ((SWIR + RED) + (NIR + BLUE))
+    let test_cases = [
+        // SWIR, RED, NIR, BLUE, Expected BSI
+        (3000.0, 2000.0, 1000.0, 500.0, 0.429),  // ((3000+2000)-(1000+500))/((3000+2000)+(1000+500)) = 3500/6500 = 0.538
+        (2000.0, 2000.0, 2000.0, 2000.0, 0.0),   // ((2000+2000)-(2000+2000))/((2000+2000)+(2000+2000)) = 0/8000 = 0
+        (1000.0, 1000.0, 3000.0, 2000.0, -0.429), // ((1000+1000)-(3000+2000))/((1000+1000)+(3000+2000)) = -3000/7000 = -0.429
+        (0.0, 0.0, 0.0, 0.0, -999.0),            // Special case - divide by zero
+    ];
+    
+    // Create input band data
+    let swir_values: Vec<f32> = test_cases.iter().map(|(swir, _, _, _, _)| *swir).collect();
+    let red_values: Vec<f32> = test_cases.iter().map(|(_, red, _, _, _)| *red).collect();
+    let nir_values: Vec<f32> = test_cases.iter().map(|(_, _, nir, _, _)| *nir).collect();
+    let blue_values: Vec<f32> = test_cases.iter().map(|(_, _, _, blue, _)| *blue).collect();
+    
+    // Create test buffers (using a modified approach for 4 bands)
+    let mut inputs = Vec::with_capacity(4);
+    
+    let width = 2;
+    let height = 2;
+    
+    // Create band buffers
+    let swir_buffer = Buffer::new((width, height), swir_values.clone());
+    let red_buffer = Buffer::new((width, height), red_values.clone());
+    let nir_buffer = Buffer::new((width, height), nir_values.clone());
+    let blue_buffer = Buffer::new((width, height), blue_values.clone());
+    
+    inputs.push(TypedBuffer::F32(swir_buffer));
+    inputs.push(TypedBuffer::F32(red_buffer));
+    inputs.push(TypedBuffer::F32(nir_buffer));
+    inputs.push(TypedBuffer::F32(blue_buffer));
+    
+    // Create BSI calculator (indices 0, 1, 2, 3 for SWIR, RED, NIR, BLUE)
+    let bsi = BSI::new(0, 1, 2, 3, None);
+    
+    // Calculate BSI
+    let result = bsi.calculate(&inputs);
+    let result_values = get_results(&result);
+    
+    // Verify results
+    for (i, (_, _, _, _, expected)) in test_cases.iter().enumerate() {
         if *expected == -999.0 {
             assert_eq!(result_values[i], -999.0);
         } else {

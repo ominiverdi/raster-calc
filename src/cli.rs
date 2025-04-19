@@ -74,4 +74,34 @@ pub enum Commands {
         #[arg(short = 'b', long)]
         nir: PathBuf,
     },
+    
+    /// Normalized Difference Snow Index: (GREEN-SWIR)/(GREEN+SWIR)
+    Ndsi {
+        /// Green band (A)
+        #[arg(short = 'a', long)]
+        green: PathBuf,
+        
+        /// SWIR band (B) - typically Sentinel-2 B11
+        #[arg(short = 'b', long)]
+        swir: PathBuf,
+    },
+    
+    /// Bare Soil Index: ((SWIR+RED)-(NIR+BLUE))/((SWIR+RED)+(NIR+BLUE))
+    Bsi {
+        /// SWIR band - typically Sentinel-2 B11
+        #[arg(short = 's', long)]
+        swir: PathBuf,
+        
+        /// RED band
+        #[arg(short = 'r', long)]
+        red: PathBuf,
+        
+        /// NIR band
+        #[arg(short = 'n', long)]
+        nir: PathBuf,
+        
+        /// BLUE band
+        #[arg(short = 'b', long)]
+        blue: PathBuf,
+    },
 }

@@ -26,12 +26,14 @@ BAND_NIR="${SENTINEL_DATA_DIR}/T33TTG_20250305T100029_B08_10m.jp2"
 BAND_RED="${SENTINEL_DATA_DIR}/T33TTG_20250305T100029_B04_10m.jp2"
 BAND_GREEN="${SENTINEL_DATA_DIR}/T33TTG_20250305T100029_B03_10m.jp2"
 BAND_BLUE="${SENTINEL_DATA_DIR}/T33TTG_20250305T100029_B02_10m.jp2"
+BAND_SWIR="${SENTINEL_DATA_DIR}/T33TTG_20250305T100029_B11_20m.jp2"
 
 # Check bands existence
 [ -f "$BAND_NIR" ] && echo "✓ Found NIR band (B08)" || { echo "✗ NIR band not found!"; BAND_NIR=""; }
 [ -f "$BAND_RED" ] && echo "✓ Found RED band (B04)" || { echo "✗ RED band not found!"; BAND_RED=""; }
 [ -f "$BAND_GREEN" ] && echo "✓ Found GREEN band (B03)" || { echo "✗ GREEN band not found!"; BAND_GREEN=""; }
 [ -f "$BAND_BLUE" ] && echo "✓ Found BLUE band (B02)" || { echo "✗ BLUE band not found!"; BAND_BLUE=""; }
+[ -f "$BAND_SWIR" ] && echo "✓ Found SWIR band (B11)" || { echo "✗ SWIR band not found!"; BAND_SWIR=""; }
 
 # NDVI tests (float32 and int16)
 if [ -n "$BAND_NIR" ] && [ -n "$BAND_RED" ]; then
@@ -82,20 +84,6 @@ if [ -n "$BAND_NIR" ] && [ -n "$BAND_RED" ]; then
       -a "$BAND_NIR" \
       -b "$BAND_RED" \
       -o "${OUTPUT_DIR}/savi_default_int16.tif"
-
-    echo -e "\nTesting SAVI with high soil factor (L=1.0, float32)..."
-    time ../target/release/raster-calc savi \
-      -a "$BAND_NIR" \
-      -b "$BAND_RED" \
-      -l 1.0 \
-      -o "${OUTPUT_DIR}/savi_high_float.tif" --float
-
-    echo -e "\nTesting SAVI with low soil factor (L=0.25, int16)..."
-    time ../target/release/raster-calc savi \
-      -a "$BAND_NIR" \
-      -b "$BAND_RED" \
-      -l 0.25 \
-      -o "${OUTPUT_DIR}/savi_low_int16.tif"
 else
     echo "Skipping SAVI tests - required bands not available"
 fi
@@ -115,6 +103,44 @@ if [ -n "$BAND_GREEN" ] && [ -n "$BAND_NIR" ]; then
       -o "${OUTPUT_DIR}/ndwi_large_int16.tif"
 else
     echo "Skipping NDWI tests - required bands not available"
+fi
+
+# NDSI tests (float32 and int16)
+if [ -n "$BAND_GREEN" ] && [ -n "$BAND_SWIR" ]; then
+    echo -e "\nTesting NDSI (float32)..."
+    time ../target/release/raster-calc ndsi \
+      -a "$BAND_GREEN" \
+      -b "$BAND_SWIR" \
+      -o "${OUTPUT_DIR}/ndsi_large_float.tif" --float
+
+    echo -e "\nTesting NDSI (int16)..."
+    time ../target/release/raster-calc ndsi \
+      -a "$BAND_GREEN" \
+      -b "$BAND_SWIR" \
+      -o "${OUTPUT_DIR}/ndsi_large_int16.tif"
+else
+    echo "Skipping NDSI tests - required bands not available"
+fi
+
+# BSI tests (float32 and int16)
+if [ -n "$BAND_SWIR" ] && [ -n "$BAND_RED" ] && [ -n "$BAND_NIR" ] && [ -n "$BAND_BLUE" ]; then
+    echo -e "\nTesting BSI (float32)..."
+    time ../target/release/raster-calc bsi \
+      -s "$BAND_SWIR" \
+      -r "$BAND_RED" \
+      -n "$BAND_NIR" \
+      -b "$BAND_BLUE" \
+      -o "${OUTPUT_DIR}/bsi_large_float.tif" --float
+
+    echo -e "\nTesting BSI (int16)..."
+    time ../target/release/raster-calc bsi \
+      -s "$BAND_SWIR" \
+      -r "$BAND_RED" \
+      -n "$BAND_NIR" \
+      -b "$BAND_BLUE" \
+      -o "${OUTPUT_DIR}/bsi_large_int16.tif"
+else
+    echo "Skipping BSI tests - required bands not available"
 fi
 
 # Verify outputs exist and show basic info
