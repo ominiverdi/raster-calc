@@ -2,7 +2,7 @@
 name = "raster-calc"
 version = "0.1.0"
 edition = "2021"
-authors = ["ominiverdi"]
+authors = ["Lorenzo Becchi"]
 description = "High-performance raster calculator for spectral indices"
 license = "MIT"
 
@@ -29,3 +29,11 @@ path = "src/lib.rs"
 [[bin]]
 name = "raster-calc"
 path = "src/main.rs"
+
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "benchmark"
+harness = false

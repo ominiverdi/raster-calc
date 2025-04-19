@@ -2,8 +2,7 @@
 pub mod cli;
 pub mod io;
 pub mod utils;
-
-
+pub mod processing;
 
 // Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
