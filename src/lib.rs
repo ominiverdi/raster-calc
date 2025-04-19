@@ -1,6 +1,5 @@
 // src/lib.rs
 pub mod cli;
-pub mod io;
 pub mod utils;
 pub mod processing;
 

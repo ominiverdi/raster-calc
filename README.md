@@ -19,7 +19,6 @@ raster-calc delivers significantly faster processing compared to traditional GDA
 - Calculate common vegetation indices (NDVI, EVI, SAVI)
 - Water indices (NDWI, MNDWI) 
 - Soil and mineral indices (NDSI, BSI)
-- Custom index formulas via simple expression syntax
 - Parallel processing for large rasters
 - Memory-efficient streaming for massive files
 - Fixed-point arithmetic optimization (smaller outputs, faster processing)
