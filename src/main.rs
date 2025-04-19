@@ -3,7 +3,6 @@ use anyhow::Result;
 use clap::Parser;
 
 mod cli;
-mod indices;
 mod io;
 mod utils;
 mod processing;
