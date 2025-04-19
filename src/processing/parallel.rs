@@ -235,7 +235,7 @@ impl ParallelBlockReader {
                 for request in req_rx {
                     let block = {
                         let region_size = request.state.region_size;
-                        let dataset = datasets[thread_id][request.dataset_idx].lock();
+                        let dataset = request.datasets[thread_id][request.dataset_idx].lock();
                         let band = dataset.rasterband(1).unwrap();
                         let size = band.size();
                         let window = (request.x * region_size.0, request.y * region_size.1);
