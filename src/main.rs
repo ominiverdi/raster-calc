@@ -7,7 +7,7 @@ mod utils;
 mod processing;
 
 use crate::cli::{Cli, Commands};
-use crate::processing::{ParallelProcessor, indices::{NDI, EVI, SAVI, NDWI, NDSI, BSI}};
+use crate::processing::{ParallelProcessor, indices::{NDI, EVI, SAVI, NDWI, NDSI, BSI, MSAVI2, OSAVI}};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -98,6 +98,37 @@ fn main() -> Result<()> {
                     red.to_string_lossy().to_string(),
                     nir.to_string_lossy().to_string(),
                     blue.to_string_lossy().to_string()
+                ],
+                cli.output.to_string_lossy().as_ref(),
+                !cli.float,
+                cli.scale_factor,
+            )?;
+        },
+        Commands::Msavi2 { nir, red } => {
+            // Create MSAVI2 calculator with NIR and Red bands
+            let msavi2 = MSAVI2::new(0, 1, None);
+            
+            processor.process(
+                msavi2,
+                &[
+                    nir.to_string_lossy().to_string(),
+                    red.to_string_lossy().to_string()
+                ],
+                cli.output.to_string_lossy().as_ref(),
+                !cli.float,
+                cli.scale_factor,
+            )?;
+        },
+        
+        Commands::Osavi { nir, red } => {
+            // Create OSAVI calculator with NIR and Red bands
+            let osavi = OSAVI::new(0, 1, None);
+            
+            processor.process(
+                osavi,
+                &[
+                    nir.to_string_lossy().to_string(),
+                    red.to_string_lossy().to_string()
                 ],
                 cli.output.to_string_lossy().as_ref(),
                 !cli.float,
