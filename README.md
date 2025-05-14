@@ -14,15 +14,30 @@ raster-calc delivers significantly faster processing compared to traditional GDA
 
 *Benchmark on Intel i9-10900 with Sentinel-2 10980×10980 image (10m resolution)*
 
+## Supported Indices
+
+| Index | Name | Formula | Application |
+|-------|------|---------|-------------|
+| NDI/NDVI | Normalized Difference (Vegetation) Index | (NIR-RED)/(NIR+RED) | Vegetation health monitoring |
+| EVI | Enhanced Vegetation Index | 2.5 × (NIR-RED)/(NIR+6×RED-7.5×BLUE+1) | Improved vegetation monitoring in high biomass regions |
+| SAVI | Soil Adjusted Vegetation Index | [(NIR-RED)/(NIR+RED+L)] × (1+L) | Vegetation in areas with high soil exposure |
+| NDWI | Normalized Difference Water Index | (GREEN-NIR)/(GREEN+NIR) | Surface water detection |
+| NDSI | Normalized Difference Snow Index | (GREEN-SWIR)/(GREEN+SWIR) | Snow and ice detection |
+| BSI | Bare Soil Index | [(SWIR+RED)-(NIR+BLUE)]/[(SWIR+RED)+(NIR+BLUE)] | Bare soil and urban areas |
+| MSAVI2 | Modified Soil Adjusted Vegetation Index | [2×NIR+1-√((2×NIR+1)²-8×(NIR-RED))]/2 | Improved correction for soil influence |
+| OSAVI | Optimized Soil Adjusted Vegetation Index | (NIR-RED)/(NIR+RED+0.16) × 1.16 | Optimized for agricultural monitoring |
+
 ## Features
 
-- Calculate common vegetation indices (NDVI, EVI, SAVI)
-- Water indices (NDWI, MNDWI) 
-- Soil and mineral indices (NDSI, BSI)
+- Calculate common vegetation indices (NDVI, EVI, SAVI, MSAVI2, OSAVI)
+- Water indices (NDWI)
+- Snow and ice indices (NDSI)
+- Soil and mineral indices (BSI)
 - Parallel processing for large rasters
 - Memory-efficient streaming for massive files
 - Fixed-point arithmetic optimization (smaller outputs, faster processing)
 - Support for GeoTIFF, JPEG2000, and other GDAL formats
+- Customizable compression options
 
 ## Installation
 
@@ -36,18 +51,57 @@ cargo build --release
 cp target/release/raster-calc ~/.local/bin/
 ```
 
-## Usage
+## Usage Examples
 
 ```bash
-# Calculate NDVI with float output
-raster-calc ndi -a NIR_BAND.tif -b RED_BAND.tif -o output.tif --float
+# Calculate NDVI (Normalized Difference Vegetation Index)
+raster-calc ndi -a NIR_BAND.tif -b RED_BAND.tif -o ndvi_output.tif
 
-# Calculate NDVI with int16 output (more efficient)
-raster-calc ndi -a NIR_BAND.tif -b RED_BAND.tif -o output.tif
+# Calculate EVI (Enhanced Vegetation Index)
+raster-calc evi -a NIR_BAND.tif -b RED_BAND.tif -c BLUE_BAND.tif -o evi_output.tif
+
+# Calculate SAVI (Soil Adjusted Vegetation Index) with custom soil factor
+raster-calc savi -a NIR_BAND.tif -b RED_BAND.tif -l 0.8 -o savi_output.tif
+
+# Calculate NDWI (Normalized Difference Water Index)
+raster-calc ndwi -a GREEN_BAND.tif -b NIR_BAND.tif -o ndwi_output.tif
+
+# Calculate NDSI (Normalized Difference Snow Index)
+raster-calc ndsi -a GREEN_BAND.tif -b SWIR_BAND.tif -o ndsi_output.tif
+
+# Calculate BSI (Bare Soil Index)
+raster-calc bsi -s SWIR_BAND.tif -r RED_BAND.tif -n NIR_BAND.tif -b BLUE_BAND.tif -o bsi_output.tif
+
+# Calculate MSAVI2 (Modified Soil Adjusted Vegetation Index)
+raster-calc msavi2 -a NIR_BAND.tif -b RED_BAND.tif -o msavi2_output.tif
+
+# Calculate OSAVI (Optimized Soil Adjusted Vegetation Index)
+raster-calc osavi -a NIR_BAND.tif -b RED_BAND.tif -o osavi_output.tif
 
 # For Sentinel-2 specifically:
 raster-calc ndi -a B08.jp2 -b B04.jp2 -o ndvi.tif
 ```
+
+## Compression Options
+
+raster-calc supports various compression options for the output GeoTIFF files:
+
+```bash
+# Specify compression algorithm (NONE, DEFLATE, LZW, ZSTD)
+raster-calc ndi -a NIR.tif -b RED.tif -o output.tif --compress ZSTD
+
+# Set compression level (1-9 for DEFLATE, 1-22 for ZSTD)
+raster-calc ndi -a NIR.tif -b RED.tif -o output.tif --compress ZSTD --compress-level 12
+
+# Disable tiled output for special use cases
+raster-calc ndi -a NIR.tif -b RED.tif -o output.tif --tiled false
+```
+
+Default settings:
+- Compression: DEFLATE
+- Compression Level: 6
+- Tiled: true
+- Threads: All available CPUs
 
 ## Equivalent gdal_calc.py Commands
 
@@ -91,6 +145,9 @@ OPTIONS:
     -o, --output <FILE>             Output file path [default: output.tif]
     --float                         Use float32 instead of int16
     --scale-factor <VALUE>          Scaling factor for fixed-point [default: 10000]
+    --compress <TYPE>               Compression type: NONE, DEFLATE, LZW, ZSTD [default: DEFLATE]
+    --compress-level <LEVEL>        Compression level (1-9 for DEFLATE, 1-22 for ZSTD) [default: 6]
+    --tiled <BOOL>                  Use tiled output [default: true]
     -h, --help                      Print help information
     -V, --version                   Print version information
 
@@ -98,6 +155,11 @@ SUBCOMMANDS:
     ndi                             Normalized Difference Index: (A-B)/(A+B)
     evi                             Enhanced Vegetation Index
     savi                            Soil Adjusted Vegetation Index
+    ndwi                            Normalized Difference Water Index
+    ndsi                            Normalized Difference Snow Index
+    bsi                             Bare Soil Index
+    msavi2                          Modified Soil Adjusted Vegetation Index
+    osavi                           Optimized Soil Adjusted Vegetation Index
     help                            Print this message or help for a subcommand
 ```
 

@@ -24,6 +24,9 @@ fn main() -> Result<()> {
                 cli.output.to_string_lossy().as_ref(),
                 !cli.float,
                 cli.scale_factor,
+                &cli.compress,          
+                cli.compress_level,     
+                cli.tiled,              
             )?;
         },
         Commands::Evi { nir, red, blue } => {
@@ -40,6 +43,9 @@ fn main() -> Result<()> {
                 cli.output.to_string_lossy().as_ref(),
                 !cli.float,
                 cli.scale_factor,
+                &cli.compress,          
+                cli.compress_level,     
+                cli.tiled,          
             )?;
         },
         Commands::Savi { nir, red, soil_factor } => {
@@ -55,6 +61,9 @@ fn main() -> Result<()> {
                 cli.output.to_string_lossy().as_ref(),
                 !cli.float,
                 cli.scale_factor,
+                &cli.compress,          
+                cli.compress_level,     
+                cli.tiled,          
             )?;
         },
         Commands::Ndwi { green, nir } => {
@@ -70,6 +79,9 @@ fn main() -> Result<()> {
                 cli.output.to_string_lossy().as_ref(),
                 !cli.float,
                 cli.scale_factor,
+                &cli.compress,          
+                cli.compress_level,     
+                cli.tiled,          
             )?;
         },
         Commands::Ndsi { green, swir } => {
@@ -85,6 +97,9 @@ fn main() -> Result<()> {
                 cli.output.to_string_lossy().as_ref(),
                 !cli.float,
                 cli.scale_factor,
+                &cli.compress,          
+                cli.compress_level,     
+                cli.tiled,          
             )?;
         },
         Commands::Bsi { swir, red, nir, blue } => {
@@ -102,6 +117,9 @@ fn main() -> Result<()> {
                 cli.output.to_string_lossy().as_ref(),
                 !cli.float,
                 cli.scale_factor,
+                &cli.compress,          
+                cli.compress_level,     
+                cli.tiled,          
             )?;
         },
         Commands::Msavi2 { nir, red } => {
@@ -117,6 +135,9 @@ fn main() -> Result<()> {
                 cli.output.to_string_lossy().as_ref(),
                 !cli.float,
                 cli.scale_factor,
+                &cli.compress,          
+                cli.compress_level,     
+                cli.tiled,          
             )?;
         },
         
@@ -133,6 +154,9 @@ fn main() -> Result<()> {
                 cli.output.to_string_lossy().as_ref(),
                 !cli.float,
                 cli.scale_factor,
+                &cli.compress,          
+                cli.compress_level,     
+                cli.tiled,          
             )?;
         }
     }

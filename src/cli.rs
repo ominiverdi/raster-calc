@@ -19,6 +19,18 @@ pub struct Cli {
     /// Scaling factor for fixed-point
     #[arg(long, default_value = "10000", global = true)]
     pub scale_factor: i32,
+
+    /// Compression type (NONE, DEFLATE, LZW, ZSTD)
+    #[arg(long, default_value = "DEFLATE", global = true)]
+    pub compress: String,
+
+    /// Compression level (1-9 for DEFLATE, 1-22 for ZSTD)
+    #[arg(long, default_value = "6", global = true)]
+    pub compress_level: u8,
+
+    /// Use tiled output
+    #[arg(long, default_value = "true", global = true)]
+    pub tiled: bool,
 }
 
 #[derive(Subcommand)]
