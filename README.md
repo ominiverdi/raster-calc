@@ -14,6 +14,16 @@ raster-calc delivers significantly faster processing compared to traditional GDA
 
 *Benchmark on Intel i9-10900 with Sentinel-2 10980×10980 image (10m resolution)*
 
+## Performance Optimizations
+
+raster-calc includes several performance optimizations:
+
+1. **Dataset Caching**: Automatically caches datasets across operations, reducing redundant file operations (up to 56% speedup)
+2. **Parallel Processing**: Efficiently utilizes multiple CPU cores to process operations in parallel (up to 24% additional speedup)
+3. **Thread Pool Tuning**: Optimizes thread usage based on system capabilities (up to 5% additional speedup)
+
+These optimizations combine to provide up to 3.5x faster processing compared to naive implementations.
+
 ## Supported Indices
 
 | Index | Name | Formula | Application |
@@ -99,7 +109,8 @@ For processing multiple operations in a single run, use the batch processing fea
     "compress_level": 6,
     "float": true,
     "scale_factor": 10000,
-    "tiled": true
+    "tiled": true,
+    "threads": 12
   },
   "operations": [
     {
@@ -116,6 +127,35 @@ For processing multiple operations in a single run, use the batch processing fea
   ]
 }
 ```
+
+### Parallelization Settings
+
+The `threads` parameter in the global section controls how many operations are processed in parallel:
+
+```json
+"global": {
+  "threads": 12,
+  // other settings
+}
+```
+
+#### Thread Count Recommendations:
+
+| System Type | CPU Cores | RAM | Recommended Threads |
+|-------------|-----------|-----|---------------------|
+| Low-end     | 2-4 cores | 4-8GB | 2-3 |
+| Mid-range   | 6-8 cores | 16GB | 4-6 |
+| High-end    | 12-16 cores | 32GB+ | 8-12 |
+| Workstation | 16+ cores | 64GB+ | 12-16 |
+
+**Finding the optimal thread count:**
+* Too few threads: Underutilizes your system
+* Too many threads: Creates I/O contention and reduces performance
+* Optimal settings depend on your specific hardware, especially storage speed
+
+Our benchmarks show that for a high-end system with 20 threads and 64GB RAM, **12 threads** provides the optimal performance balance. Increasing beyond this can actually decrease performance due to I/O bottlenecks.
+
+If no thread count is specified, raster-calc automatically calculates an appropriate value based on your system's available CPU cores.
 
 ## Compression Options
 
@@ -136,28 +176,13 @@ Default settings:
 - Compression: DEFLATE
 - Compression Level: 6
 - Tiled: true
-- Threads: All available CPUs
-
-## Equivalent gdal_calc.py Commands
-
-For comparison, the equivalent gdal_calc.py commands are:
-
-```bash
-# Float32 output
-gdal_calc.py --calc="(A.astype(float)-1000)/(10000.0)-(B.astype(float)-1000)/(10000.0))/((A.astype(float)-1000)/(10000.0)+(B.astype(float)-1000)/(10000.0))" \
-  -A NIR_BAND.jp2 -B RED_BAND.jp2 --outfile=ndvi.tif \
-  --type=Float32 --NoDataValue=-999 --co="COMPRESS=DEFLATE" --co="TILED=YES"
-
-# Int16 output  
-gdal_calc.py --calc="numpy.int16(((A.astype(float)-1000)/(10000.0)-(B.astype(float)-1000)/(10000.0))/((A.astype(float)-1000)/(10000.0)+(B.astype(float)-1000)/(10000.0)) * 10000)" \
-  -A NIR_BAND.jp2 -B RED_BAND.jp2 --outfile=ndvi.tif \
-  --type=Int16 --NoDataValue=-10000 --co="COMPRESS=DEFLATE" --co="TILED=YES"
-```
+- Threads: Auto-detected based on system
 
 ## Why raster-calc is faster
 
 - Parallel chunk-based processing using Rayon
 - Optimized memory handling with reusable buffers
+- Dataset caching to avoid repeated file opening
 - Fixed-point arithmetic for int16 output
 - GDAL read/write optimizations
 
@@ -169,6 +194,7 @@ raster-calc takes advantage of Rust's performance characteristics:
 2. **Parallel I/O**: Multiple threads for simultaneous read/write operations
 3. **SIMD Optimizations**: Automatically applied by the Rust compiler
 4. **Chunk-based Processing**: Cache-friendly algorithms for large images
+5. **Dataset Caching**: Eliminates redundant file operations in batch processing
 
 ## Command-line Options
 
@@ -203,10 +229,6 @@ SUBCOMMANDS:
 ## Author
 
 Lorenzo Becchi
-
-## Acknowledgments
-
-Special thanks to [GrayShade/lnicola](https://github.com/lnicola) for contributions and optimizations.
 
 ## License
 

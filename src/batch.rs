@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use rayon::prelude::*;
+use rayon::ThreadPoolBuilder;
+
 
 use crate::utils::cache::RasterCache;
 use std::collections::HashSet;
@@ -31,6 +34,8 @@ pub struct GlobalParams {
     pub scale_factor: i32,
     #[serde(default = "default_true")]
     pub tiled: bool,
+    #[serde(default)]
+    pub threads: Option<usize>,
 }
 
 fn default_compress() -> String {
@@ -118,6 +123,22 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
     let config_content = fs::read_to_string(config_path)?;
     let config: BatchConfig = serde_json::from_str(&config_content)?;
 
+
+
+    // Get thread count from config or use default calculation
+    let thread_count = config.global.threads.unwrap_or_else(|| {
+        std::cmp::max(4, (num_cpus::get() as f32 * 0.6) as usize)
+    });
+    
+    println!("Configuring thread pool with {} threads (of {} available)", 
+             thread_count, num_cpus::get());
+             
+    // Configure thread pool
+    ThreadPoolBuilder::new()
+        .num_threads(thread_count)
+        .build_global()
+        .unwrap_or_else(|e| eprintln!("Warning: Thread pool configuration failed: {}", e));
+    
     // Create shared cache
     let cache = Arc::new(RasterCache::new());
     
@@ -125,7 +146,7 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
     let unique_paths: Vec<String> = collect_unique_paths(&config).into_iter().collect();
     println!("Found {} unique input files", unique_paths.len());
     
-    // Prefetch datasets (optional but helpful)
+    // Prefetch datasets
     for path in &unique_paths {
         if let Err(e) = cache.get_dataset(path) {
             eprintln!("Warning: Could not preload {}: {}", path, e);
@@ -133,79 +154,162 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
     }
     println!("Cache initialized with {} datasets", cache.len());
     
-    // Create processor with cache
-    let processor = ParallelProcessor::with_cache(None, Arc::clone(&cache));
-
-    println!("Starting batch processing with {} operations...", config.operations.len());
-
-    for (i, op) in config.operations.iter().enumerate() {
+    println!("Starting parallel batch processing with {} operations...", config.operations.len());
+    
+    // Track errors across parallel operations
+    let errors = Arc::new(Mutex::new(Vec::new()));
+    
+    // Process operations in parallel using rayon
+    config.operations.par_iter().enumerate().for_each(|(i, op)| {
         println!("[{}/{}] Processing {} -> {}", i + 1, config.operations.len(), op.op_type, op.output);
-
+        
+        // Create a processor for each parallel operation with the shared cache
+        let processor = ParallelProcessor::with_cache(None, Arc::clone(&cache));
+        
+        // Get operation parameters
         let float = op.float.unwrap_or(config.global.float);
         let scale_factor = op.scale_factor.unwrap_or(config.global.scale_factor);
         let compress = op.compress.as_deref().unwrap_or(&config.global.compress);
         let compress_level = op.compress_level.unwrap_or(config.global.compress_level);
         let tiled = op.tiled.unwrap_or(config.global.tiled);
-
+        
+        // Process based on operation type
         let result = match op.op_type.to_lowercase().as_str() {
             "ndi" => {
-                let p: NdiParams = serde_json::from_value(op.params.clone())
-                    .context("Invalid parameters for NDI operation")?;
-                let alg = NDI::new(0, 1, None);
-                processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, compress, compress_level, tiled)
+                match serde_json::from_value::<NdiParams>(op.params.clone()) {
+                    Ok(p) => {
+                        let alg = NDI::new(0, 1, None);
+                        processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
+                                       compress, compress_level, tiled)
+                    },
+                    Err(e) => {
+                        let mut error_list = errors.lock().unwrap();
+                        error_list.push(format!("Error parsing NDI params for operation {}: {}", i + 1, e));
+                        return;
+                    }
+                }
             },
             "evi" => {
-                let p: EviParams = serde_json::from_value(op.params.clone())
-                    .context("Invalid parameters for EVI operation")?;
-                let alg = EVI::new(0, 1, 2, None);
-                processor.process(alg, &[p.a, p.b, p.c], &op.output, !float, scale_factor, compress, compress_level, tiled)
+                match serde_json::from_value::<EviParams>(op.params.clone()) {
+                    Ok(p) => {
+                        let alg = EVI::new(0, 1, 2, None);
+                        processor.process(alg, &[p.a, p.b, p.c], &op.output, !float, scale_factor, 
+                                       compress, compress_level, tiled)
+                    },
+                    Err(e) => {
+                        let mut error_list = errors.lock().unwrap();
+                        error_list.push(format!("Error parsing EVI params for operation {}: {}", i + 1, e));
+                        return;
+                    }
+                }
             },
             "savi" => {
-                let p: SaviParams = serde_json::from_value(op.params.clone())
-                    .context("Invalid parameters for SAVI operation")?;
-                let alg = SAVI::new(0, 1, p.l.unwrap_or(0.5), None);
-                processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, compress, compress_level, tiled)
+                match serde_json::from_value::<SaviParams>(op.params.clone()) {
+                    Ok(p) => {
+                        let alg = SAVI::new(0, 1, p.l.unwrap_or(0.5), None);
+                        processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
+                                       compress, compress_level, tiled)
+                    },
+                    Err(e) => {
+                        let mut error_list = errors.lock().unwrap();
+                        error_list.push(format!("Error parsing SAVI params for operation {}: {}", i + 1, e));
+                        return;
+                    }
+                }
             },
             "ndwi" => {
-                let p: NdwiParams = serde_json::from_value(op.params.clone())
-                    .context("Invalid parameters for NDWI operation")?;
-                let alg = NDWI::new(0, 1, None);
-                processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, compress, compress_level, tiled)
+                match serde_json::from_value::<NdwiParams>(op.params.clone()) {
+                    Ok(p) => {
+                        let alg = NDWI::new(0, 1, None);
+                        processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
+                                       compress, compress_level, tiled)
+                    },
+                    Err(e) => {
+                        let mut error_list = errors.lock().unwrap();
+                        error_list.push(format!("Error parsing NDWI params for operation {}: {}", i + 1, e));
+                        return;
+                    }
+                }
             },
             "ndsi" => {
-                let p: NdsiParams = serde_json::from_value(op.params.clone())
-                    .context("Invalid parameters for NDSI operation")?;
-                let alg = NDSI::new(0, 1, None);
-                processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, compress, compress_level, tiled)
+                match serde_json::from_value::<NdsiParams>(op.params.clone()) {
+                    Ok(p) => {
+                        let alg = NDSI::new(0, 1, None);
+                        processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
+                                       compress, compress_level, tiled)
+                    },
+                    Err(e) => {
+                        let mut error_list = errors.lock().unwrap();
+                        error_list.push(format!("Error parsing NDSI params for operation {}: {}", i + 1, e));
+                        return;
+                    }
+                }
             },
             "bsi" => {
-                let p: BsiParams = serde_json::from_value(op.params.clone())
-                    .context("Invalid parameters for BSI operation")?;
-                let alg = BSI::new(0, 1, 2, 3, None);
-                processor.process(alg, &[p.s, p.r, p.n, p.b], &op.output, !float, scale_factor, compress, compress_level, tiled)
+                match serde_json::from_value::<BsiParams>(op.params.clone()) {
+                    Ok(p) => {
+                        let alg = BSI::new(0, 1, 2, 3, None);
+                        processor.process(alg, &[p.s, p.r, p.n, p.b], &op.output, !float, scale_factor, 
+                                       compress, compress_level, tiled)
+                    },
+                    Err(e) => {
+                        let mut error_list = errors.lock().unwrap();
+                        error_list.push(format!("Error parsing BSI params for operation {}: {}", i + 1, e));
+                        return;
+                    }
+                }
             },
             "msavi2" => {
-                let p: MsaviParams = serde_json::from_value(op.params.clone())
-                    .context("Invalid parameters for MSAVI2 operation")?;
-                let alg = MSAVI2::new(0, 1, None);
-                processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, compress, compress_level, tiled)
+                match serde_json::from_value::<MsaviParams>(op.params.clone()) {
+                    Ok(p) => {
+                        let alg = MSAVI2::new(0, 1, None);
+                        processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
+                                       compress, compress_level, tiled)
+                    },
+                    Err(e) => {
+                        let mut error_list = errors.lock().unwrap();
+                        error_list.push(format!("Error parsing MSAVI2 params for operation {}: {}", i + 1, e));
+                        return;
+                    }
+                }
             },
             "osavi" => {
-                let p: OsaviParams = serde_json::from_value(op.params.clone())
-                    .context("Invalid parameters for OSAVI operation")?;
-                let alg = OSAVI::new(0, 1, None);
-                processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, compress, compress_level, tiled)
+                match serde_json::from_value::<OsaviParams>(op.params.clone()) {
+                    Ok(p) => {
+                        let alg = OSAVI::new(0, 1, None);
+                        processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
+                                       compress, compress_level, tiled)
+                    },
+                    Err(e) => {
+                        let mut error_list = errors.lock().unwrap();
+                        error_list.push(format!("Error parsing OSAVI params for operation {}: {}", i + 1, e));
+                        return;
+                    }
+                }
             },
-            _ => Err(anyhow::anyhow!("Unknown operation type: {}", op.op_type)),
+            _ => {
+                let mut error_list = errors.lock().unwrap();
+                error_list.push(format!("Unknown operation type for operation {}: {}", i + 1, op.op_type));
+                return;
+            }
         };
-
+        
         if let Err(e) = result {
-            return Err(anyhow::anyhow!("Error processing operation {}: {}", i + 1, e));
+            let mut error_list = errors.lock().unwrap();
+            error_list.push(format!("Error processing operation {}: {}", i + 1, e));
         }
+    });
+    
+    // Check if any errors occurred
+    let error_list = errors.lock().unwrap();
+    if !error_list.is_empty() {
+        for error in error_list.iter() {
+            eprintln!("{}", error);
+        }
+        return Err(anyhow::anyhow!("Errors occurred during batch processing"));
     }
-
-    println!("Batch processing complete with {} cached datasets", processor.cache_size());
-    processor.clear_cache();
+    
+    println!("Batch processing complete with {} cached datasets", cache.len());
     Ok(())
 }
 

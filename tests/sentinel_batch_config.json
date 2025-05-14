@@ -5,7 +5,9 @@
         "compress_level": 6,
         "float": true,
         "scale_factor": 10000,
-        "tiled": true
+        "tiled": true,
+        "threads": 2
+
     },
     "operations": [
         {
