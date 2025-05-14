@@ -1,4 +1,5 @@
 // src/processing/parallel.rs
+use crate::utils::cache::RasterCache;
 use gdal::Metadata;
 
 use std::{
@@ -42,6 +43,7 @@ struct BlockReadState {
 
 pub struct ParallelProcessor {
     io_threads: usize,
+    cache: Option<Arc<RasterCache>>, // Make cache optional
 }
 
 impl ParallelProcessor {
@@ -53,7 +55,38 @@ impl ParallelProcessor {
                 .max(4)
         });
 
-        Self { io_threads }
+        Self {
+            io_threads,
+            cache: None,
+        }
+    }
+    pub fn cache_size(&self) -> usize {
+        if let Some(cache) = &self.cache {
+            cache.len()
+        } else {
+            0
+        }
+    }
+    
+    pub fn clear_cache(&self) {
+        if let Some(cache) = &self.cache {
+            cache.clear();
+        }
+    }
+
+    // Add method to create with cache
+    pub fn with_cache(io_threads: Option<usize>, cache: Arc<RasterCache>) -> Self {
+        let io_threads = io_threads.unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(NonZero::get)
+                .unwrap_or(4)
+                .max(4)
+        });
+
+        Self {
+            io_threads,
+            cache: Some(cache),
+        }
     }
 
     pub fn process<I: IndexCalculator>(
@@ -96,7 +129,13 @@ impl ParallelProcessor {
         }
 
         // For larger images, use the parallel block reader
-        let block_reader = ParallelBlockReader::new(input_paths, self.io_threads)?;
+        // Create block reader with cache if available
+        let block_reader = if let Some(cache) = &self.cache {
+            ParallelBlockReader::with_cache(input_paths, self.io_threads, Arc::clone(cache))
+                .map_err(|e| anyhow::anyhow!("Failed to create block reader: {}", e))?
+        } else {
+            ParallelBlockReader::new(input_paths, self.io_threads)?
+        };
 
         let driver =
             DriverManager::get_output_driver_for_dataset_name(output_path, DriverType::Raster)
@@ -386,7 +425,10 @@ impl ParallelProcessor {
 }
 
 struct ParallelBlockReader {
+    // Instead of storing datasets directly, store paths when using cache
     datasets: Arc<Vec<Box<[Arc<Mutex<Dataset>>]>>>,
+    dataset_paths: Option<Arc<Vec<String>>>,
+    cache: Option<Arc<RasterCache>>,
     region_size: (usize, usize),
     blocks: (usize, usize),
     workers: Vec<JoinHandle<()>>,
@@ -502,6 +544,149 @@ impl ParallelBlockReader {
 
         Ok(Self {
             datasets,
+            dataset_paths: None,
+            cache: None,
+            region_size,
+            blocks,
+            workers,
+            req_tx,
+        })
+    }
+    // New constructor that uses cache
+    pub fn with_cache(
+        paths: &[String],
+        threads: usize,
+        cache: Arc<RasterCache>,
+    ) -> anyhow::Result<Self> {
+        // Create dataset_paths
+        let dataset_paths = Arc::new(paths.to_vec());
+
+        // For dimensions, we temporarily open the first dataset
+        let first_dataset = cache.get_dataset(&paths[0])?;
+        let band_size = {
+            let dataset = first_dataset.lock().unwrap();
+            let band = dataset.rasterband(1)?;
+            let size = band.size();
+            let block_size = band.block_size();
+            (size, block_size)
+        };
+
+        // Set up the region size and blocks similarly to the original implementation
+        let raster_size = band_size.0;
+        let block_size = band_size.1;
+
+        let region_size = if block_size.0 > 0 && block_size.1 > 0 {
+            (
+                block_size.0.min(raster_size.0),
+                block_size.1.min(raster_size.1),
+            )
+        } else {
+            (256.min(raster_size.0), 256.min(raster_size.1))
+        };
+
+        let blocks = (
+            (raster_size.0 + region_size.0 - 1) / region_size.0,
+            (raster_size.1 + region_size.1 - 1) / region_size.1,
+        );
+
+        // Create request channel
+        let (req_tx, req_rx) = flume::unbounded();
+
+        // Set up worker threads
+        let mut workers = Vec::with_capacity(threads);
+        for _ in 0..threads {
+            let req_rx = req_rx.clone();
+            let cache = Arc::clone(&cache);
+            let dataset_paths = Arc::clone(&dataset_paths);
+
+            let worker = thread::spawn(move || {
+                for request in req_rx {
+                    let BlockReadRequest {
+                        dataset_idx,
+                        x,
+                        y,
+                        state,
+                        handler,
+                        ..
+                    } = request;
+
+                    let path = &dataset_paths[dataset_idx];
+
+                    // Get dataset from cache
+                    let result = cache.get_dataset(path);
+                    if let Err(e) = result {
+                        eprintln!("Error opening dataset {}: {}", path, e);
+                        continue;
+                    }
+
+                    let dataset_mutex = result.unwrap();
+
+                    // Process block with the dataset
+                    let block = {
+                        let region_size = state.region_size;
+                        let dataset = dataset_mutex.lock().unwrap();
+                        let band = dataset.rasterband(1).unwrap();
+                        let size = band.size();
+                        let window = (x * region_size.0, y * region_size.1);
+
+                        // Same logic as original for reading the block
+                        // ...
+
+                        // Read the block
+                        if window.0 >= size.0 || window.1 >= size.1 {
+                            TypedBuffer::F32(Buffer::new((0, 0), vec![]))
+                        } else {
+                            let window_size = (
+                                if window.0 + region_size.0 <= size.0 {
+                                    region_size.0
+                                } else {
+                                    size.0 - window.0
+                                },
+                                if window.1 + region_size.1 <= size.1 {
+                                    region_size.1
+                                } else {
+                                    size.1 - window.1
+                                },
+                            );
+
+                            let buffer = band
+                                .read_as::<f32>(
+                                    (window.0 as isize, window.1 as isize),
+                                    window_size,
+                                    window_size,
+                                    None,
+                                )
+                                .unwrap();
+
+                            TypedBuffer::F32(buffer)
+                        }
+                    };
+
+                    // Use the same logic as original for handling the result
+                    let blocks = {
+                        let mut blocks = state.blocks.lock();
+                        blocks.insert(dataset_idx, block);
+                        if blocks.len() == dataset_paths.len() {
+                            let blocks = mem::take(blocks.deref_mut());
+                            Some(blocks)
+                        } else {
+                            None
+                        }
+                    };
+
+                    if let Some(blocks) = blocks {
+                        (handler)(x, y, blocks);
+                    }
+                }
+            });
+
+            workers.push(worker);
+        }
+
+        Ok(Self {
+            datasets: Arc::new(vec![]), // Empty datasets since we're using cache
+            dataset_paths: Some(dataset_paths),
+            cache: Some(cache),
             region_size,
             blocks,
             workers,
@@ -509,6 +694,7 @@ impl ParallelBlockReader {
         })
     }
 
+    // Modify run method to handle both cached and non-cached cases
     pub fn run(
         &self,
         block_x: usize,

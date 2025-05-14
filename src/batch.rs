@@ -1,12 +1,16 @@
 // src/batch.rs
-use std::path::PathBuf;
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::fs;
 use serde_json::Value;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Arc;
 
+use crate::utils::cache::RasterCache;
+use std::collections::HashSet;
+
+use crate::processing::indices::{BSI, EVI, MSAVI2, NDI, NDSI, NDWI, OSAVI, SAVI};
 use crate::processing::ParallelProcessor;
-use crate::processing::indices::{NDI, EVI, SAVI, NDWI, NDSI, BSI, MSAVI2, OSAVI};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct BatchConfig {
@@ -59,34 +63,78 @@ pub struct Operation {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct EviParams { pub a: String, pub b: String, pub c: String }
+pub struct EviParams {
+    pub a: String,
+    pub b: String,
+    pub c: String,
+}
 
 #[derive(Deserialize, Debug)]
-pub struct NdiParams { pub a: String, pub b: String }
+pub struct NdiParams {
+    pub a: String,
+    pub b: String,
+}
 
 #[derive(Deserialize, Debug)]
-pub struct SaviParams { pub a: String, pub b: String, pub l: Option<f32> }
+pub struct SaviParams {
+    pub a: String,
+    pub b: String,
+    pub l: Option<f32>,
+}
 
 #[derive(Deserialize, Debug)]
-pub struct NdwiParams { pub a: String, pub b: String }
+pub struct NdwiParams {
+    pub a: String,
+    pub b: String,
+}
 
 #[derive(Deserialize, Debug)]
-pub struct NdsiParams { pub a: String, pub b: String }
+pub struct NdsiParams {
+    pub a: String,
+    pub b: String,
+}
 
 #[derive(Deserialize, Debug)]
-pub struct BsiParams { pub s: String, pub r: String, pub n: String, pub b: String }
+pub struct BsiParams {
+    pub s: String,
+    pub r: String,
+    pub n: String,
+    pub b: String,
+}
 
 #[derive(Deserialize, Debug)]
-pub struct MsaviParams { pub a: String, pub b: String }
+pub struct MsaviParams {
+    pub a: String,
+    pub b: String,
+}
 
 #[derive(Deserialize, Debug)]
-pub struct OsaviParams { pub a: String, pub b: String }
+pub struct OsaviParams {
+    pub a: String,
+    pub b: String,
+}
 
 pub fn process_batch(config_path: &PathBuf) -> Result<()> {
     let config_content = fs::read_to_string(config_path)?;
     let config: BatchConfig = serde_json::from_str(&config_content)?;
 
-    let processor = ParallelProcessor::new(None);
+    // Create shared cache
+    let cache = Arc::new(RasterCache::new());
+    
+    // Collect all unique paths
+    let unique_paths: Vec<String> = collect_unique_paths(&config).into_iter().collect();
+    println!("Found {} unique input files", unique_paths.len());
+    
+    // Prefetch datasets (optional but helpful)
+    for path in &unique_paths {
+        if let Err(e) = cache.get_dataset(path) {
+            eprintln!("Warning: Could not preload {}: {}", path, e);
+        }
+    }
+    println!("Cache initialized with {} datasets", cache.len());
+    
+    // Create processor with cache
+    let processor = ParallelProcessor::with_cache(None, Arc::clone(&cache));
 
     println!("Starting batch processing with {} operations...", config.operations.len());
 
@@ -156,6 +204,71 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
         }
     }
 
-    println!("Batch processing complete!");
+    println!("Batch processing complete with {} cached datasets", processor.cache_size());
+    processor.clear_cache();
     Ok(())
+}
+
+fn collect_unique_paths(config: &BatchConfig) -> HashSet<String> {
+    let mut paths = HashSet::new();
+
+    for op in &config.operations {
+        match op.op_type.to_lowercase().as_str() {
+            "ndi" => {
+                if let Ok(p) = serde_json::from_value::<NdiParams>(op.params.clone()) {
+                    paths.insert(p.a);
+                    paths.insert(p.b);
+                }
+            }
+            "evi" => {
+                if let Ok(p) = serde_json::from_value::<EviParams>(op.params.clone()) {
+                    paths.insert(p.a);
+                    paths.insert(p.b);
+                    paths.insert(p.c);
+                }
+            }
+            "savi" => {
+                if let Ok(p) = serde_json::from_value::<SaviParams>(op.params.clone()) {
+                    paths.insert(p.a);
+                    paths.insert(p.b);
+                }
+            }
+            // Add other index types
+            "ndwi" => {
+                if let Ok(p) = serde_json::from_value::<NdwiParams>(op.params.clone()) {
+                    paths.insert(p.a);
+                    paths.insert(p.b);
+                }
+            }
+            "ndsi" => {
+                if let Ok(p) = serde_json::from_value::<NdsiParams>(op.params.clone()) {
+                    paths.insert(p.a);
+                    paths.insert(p.b);
+                }
+            }
+            "bsi" => {
+                if let Ok(p) = serde_json::from_value::<BsiParams>(op.params.clone()) {
+                    paths.insert(p.s);
+                    paths.insert(p.r);
+                    paths.insert(p.n);
+                    paths.insert(p.b);
+                }
+            }
+            "msavi2" => {
+                if let Ok(p) = serde_json::from_value::<MsaviParams>(op.params.clone()) {
+                    paths.insert(p.a);
+                    paths.insert(p.b);
+                }
+            }
+            "osavi" => {
+                if let Ok(p) = serde_json::from_value::<OsaviParams>(op.params.clone()) {
+                    paths.insert(p.a);
+                    paths.insert(p.b);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    paths
 }

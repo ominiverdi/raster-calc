@@ -1,3 +1,4 @@
+
 {
     "global": {
         "compress": "DEFLATE",
@@ -13,16 +14,7 @@
                 "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
                 "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2"
             },
-            "output": "../data/batch_ndvi_1_output.tif"
-        },
-        {
-            "type": "ndi",
-            "params": {
-                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
-                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2"
-            },
-            "output": "../data/batch_ndvi_2_output.tif",
-            "float": false
+            "output": "../data/batch_10m_ndvi_output.tif"
         },
         {
             "type": "evi",
@@ -31,17 +23,7 @@
                 "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2",
                 "c": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2"
             },
-            "output": "../data/batch_evi_1_output.tif"
-        },
-        {
-            "type": "evi",
-            "params": {
-                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
-                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2",
-                "c": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2"
-            },
-            "output": "../data/batch_evi_2_output.tif",
-            "compress": "ZSTD"
+            "output": "../data/batch_10m_evi_output.tif"
         },
         {
             "type": "savi",
@@ -50,7 +32,7 @@
                 "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2",
                 "l": 0.5
             },
-            "output": "../data/batch_savi_1_output.tif"
+            "output": "../data/batch_10m_savi_0.5_output.tif"
         },
         {
             "type": "savi",
@@ -59,8 +41,7 @@
                 "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2",
                 "l": 0.8
             },
-            "output": "../data/batch_savi_2_output.tif",
-            "float": false
+            "output": "../data/batch_10m_savi_0.8_output.tif"
         },
         {
             "type": "ndwi",
@@ -68,33 +49,39 @@
                 "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2",
                 "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2"
             },
-            "output": "../data/batch_ndwi_1_output.tif"
+            "output": "../data/batch_10m_ndwi_output.tif"
         },
         {
-            "type": "ndwi",
+            "type": "msavi2",
             "params": {
-                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2",
-                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2"
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2"
             },
-            "output": "../data/batch_ndwi_2_output.tif",
-            "compress": "LZW"
+            "output": "../data/batch_10m_msavi2_output.tif"
         },
         {
-            "type": "ndsi",
+            "type": "osavi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2"
+            },
+            "output": "../data/batch_10m_osavi_output.tif"
+        },
+        {
+            "type": "ndi",
             "params": {
                 "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2",
-                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2"
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2"
             },
-            "output": "../data/batch_ndsi_1_output.tif"
+            "output": "../data/batch_10m_ndi_green_blue_output.tif"
         },
         {
-            "type": "ndsi",
+            "type": "ndi",
             "params": {
-                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2",
-                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2"
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2"
             },
-            "output": "../data/batch_ndsi_2_output.tif",
-            "float": false
+            "output": "../data/batch_10m_ndi_nir_green_output.tif"
         },
         {
             "type": "bsi",
@@ -104,53 +91,180 @@
                 "n": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
                 "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2"
             },
-            "output": "../data/batch_bsi_1_output.tif"
+            "output": "../data/batch_10m_bsi_approx_output.tif",
+            "compress": "ZSTD"
+        },
+
+        {
+            "type": "ndi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_20m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_20m.jp2"
+            },
+            "output": "../data/batch_20m_ndvi_output.tif"
+        },
+        {
+            "type": "evi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_20m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_20m.jp2",
+                "c": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_20m.jp2"
+            },
+            "output": "../data/batch_20m_evi_output.tif"
+        },
+        {
+            "type": "savi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_20m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_20m.jp2",
+                "l": 0.5
+            },
+            "output": "../data/batch_20m_savi_output.tif"
+        },
+        {
+            "type": "ndwi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_20m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_20m.jp2"
+            },
+            "output": "../data/batch_20m_ndwi_output.tif"
+        },
+        {
+            "type": "ndsi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_20m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B11_20m.jp2"
+            },
+            "output": "../data/batch_20m_ndsi_output.tif"
         },
         {
             "type": "bsi",
             "params": {
-                "s": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
-                "r": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2",
-                "n": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
-                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2"
+                "s": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B11_20m.jp2",
+                "r": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_20m.jp2",
+                "n": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_20m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_20m.jp2"
             },
-            "output": "../data/batch_bsi_2_output.tif",
-            "compress": "NONE"
+            "output": "../data/batch_20m_bsi_output.tif",
+            "compress": "ZSTD"
         },
         {
             "type": "msavi2",
             "params": {
-                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
-                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2"
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_20m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_20m.jp2"
             },
-            "output": "../data/batch_msavi2_1_output.tif"
+            "output": "../data/batch_20m_msavi2_output.tif"
+        },
+        {
+            "type": "osavi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_20m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_20m.jp2"
+            },
+            "output": "../data/batch_20m_osavi_output.tif"
+        },
+        {
+            "type": "ndi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B11_20m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B12_20m.jp2"
+            },
+            "output": "../data/batch_20m_ndi_swir1_swir2_output.tif"
+        },
+        {
+            "type": "ndi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B05_20m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B06_20m.jp2"
+            },
+            "output": "../data/batch_20m_ndi_rededge1_rededge2_output.tif"
+        },
+
+        {
+            "type": "ndi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_60m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_60m.jp2"
+            },
+            "output": "../data/batch_60m_ndvi_output.tif"
+        },
+        {
+            "type": "evi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_60m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_60m.jp2",
+                "c": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_60m.jp2"
+            },
+            "output": "../data/batch_60m_evi_output.tif"
+        },
+        {
+            "type": "savi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_60m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_60m.jp2",
+                "l": 0.5
+            },
+            "output": "../data/batch_60m_savi_output.tif"
+        },
+        {
+            "type": "ndwi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_60m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_60m.jp2"
+            },
+            "output": "../data/batch_60m_ndwi_output.tif"
+        },
+        {
+            "type": "ndsi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_60m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B11_60m.jp2"
+            },
+            "output": "../data/batch_60m_ndsi_output.tif"
+        },
+        {
+            "type": "bsi",
+            "params": {
+                "s": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B11_60m.jp2",
+                "r": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_60m.jp2",
+                "n": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_60m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_60m.jp2"
+            },
+            "output": "../data/batch_60m_bsi_output.tif",
+            "compress": "ZSTD"
         },
         {
             "type": "msavi2",
             "params": {
-                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
-                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2"
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_60m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_60m.jp2"
             },
-            "output": "../data/batch_msavi2_2_output.tif",
-            "float": false
+            "output": "../data/batch_60m_msavi2_output.tif"
         },
         {
             "type": "osavi",
             "params": {
-                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
-                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2"
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_60m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_60m.jp2"
             },
-            "output": "../data/batch_osavi_1_output.tif"
+            "output": "../data/batch_60m_osavi_output.tif"
         },
         {
-            "type": "osavi",
+            "type": "ndi",
             "params": {
-                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
-                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2"
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B09_60m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B8A_60m.jp2"
             },
-            "output": "../data/batch_osavi_2_output.tif",
-            "compress": "ZSTD",
-            "compress_level": 15
+            "output": "../data/batch_60m_ndi_watervapor_nir_output.tif"
+        },
+        {
+            "type": "ndi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B09_60m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_60m.jp2"
+            },
+            "output": "../data/batch_60m_ndi_watervapor_blue_output.tif"
         }
     ]
 }
