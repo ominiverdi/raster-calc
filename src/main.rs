@@ -5,6 +5,7 @@ use clap::Parser;
 mod cli;
 mod utils;
 mod processing;
+mod batch;
 
 use crate::cli::{Cli, Commands};
 use crate::processing::{ParallelProcessor, indices::{NDI, EVI, SAVI, NDWI, NDSI, BSI, MSAVI2, OSAVI}};
@@ -14,6 +15,10 @@ fn main() -> Result<()> {
     let processor = ParallelProcessor::new(None);
 
     match &cli.command {
+        Commands::Batch { config } => {
+            batch::process_batch(config)?;
+        }
+        
         Commands::Ndi { band_a, band_b } => {
             // Create NDI calculator with band_a as first and band_b as second
             let ndi = NDI::new(0, 1, None);

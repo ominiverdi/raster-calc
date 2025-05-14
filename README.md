@@ -38,6 +38,7 @@ raster-calc delivers significantly faster processing compared to traditional GDA
 - Fixed-point arithmetic optimization (smaller outputs, faster processing)
 - Support for GeoTIFF, JPEG2000, and other GDAL formats
 - Customizable compression options
+- Batch processing for multiple operations
 
 ## Installation
 
@@ -78,8 +79,42 @@ raster-calc msavi2 -a NIR_BAND.tif -b RED_BAND.tif -o msavi2_output.tif
 # Calculate OSAVI (Optimized Soil Adjusted Vegetation Index)
 raster-calc osavi -a NIR_BAND.tif -b RED_BAND.tif -o osavi_output.tif
 
+# Batch Processing
+raster-calc batch --config batch_config.json
+# Short form
+raster-calc batch -c batch_config.json
+
 # For Sentinel-2 specifically:
 raster-calc ndi -a B08.jp2 -b B04.jp2 -o ndvi.tif
+```
+
+## Batch Processing
+
+For processing multiple operations in a single run, use the batch processing feature:
+
+```json
+{
+  "global": {
+    "compress": "DEFLATE",
+    "compress_level": 6,
+    "float": true,
+    "scale_factor": 10000,
+    "tiled": true
+  },
+  "operations": [
+    {
+      "type": "ndi",
+      "params": { "a": "NIR_BAND.tif", "b": "RED_BAND.tif" },
+      "output": "ndvi_output.tif"
+    },
+    {
+      "type": "evi",
+      "params": { "a": "NIR_BAND.tif", "b": "RED_BAND.tif", "c": "BLUE_BAND.tif" },
+      "output": "evi_output.tif",
+      "float": false
+    }
+  ]
+}
 ```
 
 ## Compression Options
@@ -157,6 +192,8 @@ SUBCOMMANDS:
     savi                            Soil Adjusted Vegetation Index
     ndwi                            Normalized Difference Water Index
     ndsi                            Normalized Difference Snow Index
+    batch                           Batch process multiple operations from a JSON config file
+        -c, --config <FILE>         Path to the JSON configuration file
     bsi                             Bare Soil Index
     msavi2                          Modified Soil Adjusted Vegetation Index
     osavi                           Optimized Soil Adjusted Vegetation Index

@@ -138,4 +138,11 @@ pub enum Commands {
         #[arg(short = 'b', long)]
         red: PathBuf,
     },
+
+    /// Process multiple operations from a JSON configuration file
+    Batch {
+        /// Path to JSON configuration file
+        #[arg(short = 'c', long)]
+        config: PathBuf,
+    },
 }
