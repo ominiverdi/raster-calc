@@ -1,0 +1,156 @@
+{
+    "global": {
+        "compress": "DEFLATE",
+        "compress_level": 6,
+        "float": true,
+        "scale_factor": 10000,
+        "tiled": true
+    },
+    "operations": [
+        {
+            "type": "ndi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2"
+            },
+            "output": "../data/batch_ndvi_1_output.tif"
+        },
+        {
+            "type": "ndi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2"
+            },
+            "output": "../data/batch_ndvi_2_output.tif",
+            "float": false
+        },
+        {
+            "type": "evi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2",
+                "c": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2"
+            },
+            "output": "../data/batch_evi_1_output.tif"
+        },
+        {
+            "type": "evi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2",
+                "c": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2"
+            },
+            "output": "../data/batch_evi_2_output.tif",
+            "compress": "ZSTD"
+        },
+        {
+            "type": "savi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2",
+                "l": 0.5
+            },
+            "output": "../data/batch_savi_1_output.tif"
+        },
+        {
+            "type": "savi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2",
+                "l": 0.8
+            },
+            "output": "../data/batch_savi_2_output.tif",
+            "float": false
+        },
+        {
+            "type": "ndwi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2"
+            },
+            "output": "../data/batch_ndwi_1_output.tif"
+        },
+        {
+            "type": "ndwi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2"
+            },
+            "output": "../data/batch_ndwi_2_output.tif",
+            "compress": "LZW"
+        },
+        {
+            "type": "ndsi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2"
+            },
+            "output": "../data/batch_ndsi_1_output.tif"
+        },
+        {
+            "type": "ndsi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2"
+            },
+            "output": "../data/batch_ndsi_2_output.tif",
+            "float": false
+        },
+        {
+            "type": "bsi",
+            "params": {
+                "s": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "r": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2",
+                "n": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B02_10m.jp2"
+            },
+            "output": "../data/batch_bsi_1_output.tif"
+        },
+        {
+            "type": "bsi",
+            "params": {
+                "s": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "r": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2",
+                "n": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2"
+            },
+            "output": "../data/batch_bsi_2_output.tif",
+            "compress": "NONE"
+        },
+        {
+            "type": "msavi2",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2"
+            },
+            "output": "../data/batch_msavi2_1_output.tif"
+        },
+        {
+            "type": "msavi2",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2"
+            },
+            "output": "../data/batch_msavi2_2_output.tif",
+            "float": false
+        },
+        {
+            "type": "osavi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B04_10m.jp2"
+            },
+            "output": "../data/batch_osavi_1_output.tif"
+        },
+        {
+            "type": "osavi",
+            "params": {
+                "a": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B08_10m.jp2",
+                "b": "../../spectral-calc-tests/data/T33TTG_20250305T100029_B03_10m.jp2"
+            },
+            "output": "../data/batch_osavi_2_output.tif",
+            "compress": "ZSTD",
+            "compress_level": 15
+        }
+    ]
+}
