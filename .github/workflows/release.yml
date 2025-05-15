@@ -4,6 +4,10 @@ on:
   release:
     types: [created]
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to attach binaries to (e.g., v0.1.0)'
+        required: true
 
 permissions:
   contents: write
@@ -18,13 +22,13 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact_name: raster-calc
-            asset_name: raster-calc-${{ github.ref_name }}-linux-x86_64
+            asset_name: raster-calc-linux-x86_64.tar.gz
           - os: windows-latest
             artifact_name: raster-calc.exe
-            asset_name: raster-calc-${{ github.ref_name }}-windows-x86_64
+            asset_name: raster-calc-windows-x86_64.zip
           - os: macos-latest
             artifact_name: raster-calc
-            asset_name: raster-calc-${{ github.ref_name }}-macos-x86_64
+            asset_name: raster-calc-macos-x86_64.tar.gz
 
     steps:
     - uses: actions/checkout@v3
@@ -43,19 +47,20 @@ jobs:
     - name: Install GDAL (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        # Download and install OSGeo4W which includes GDAL
-        curl -L -o osgeo4w-setup.exe https://download.osgeo.org/osgeo4w/v2/osgeo4w-setup.exe
-        .\osgeo4w-setup.exe --quiet-mode --no-desktop --no-startmenu --no-shortcuts --upgrade-also --site http://download.osgeo.org/osgeo4w/v2 --packages gdal
-        echo "GDAL_HOME=C:\OSGeo4W" >> $env:GITHUB_ENV
-        echo "C:\OSGeo4W\bin" >> $env:GITHUB_PATH
+        # Use vcpkg for GDAL installation
+        git clone https://github.com/microsoft/vcpkg.git
+        cd vcpkg
+        .\bootstrap-vcpkg.bat
+        .\vcpkg.exe install gdal:x64-windows
+
+        # Set environment variables for GDAL
+        echo "GDAL_HOME=$(pwd)\installed\x64-windows" >> $env:GITHUB_ENV
+        echo "GDAL_INCLUDE_DIR=$(pwd)\installed\x64-windows\include" >> $env:GITHUB_ENV
+        echo "GDAL_LIB_DIR=$(pwd)\installed\x64-windows\lib" >> $env:GITHUB_ENV
+        echo "$(pwd)\installed\x64-windows\bin" >> $env:GITHUB_PATH
     
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
-    
-    - name: Set PKG_CONFIG_PATH (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        echo "PKG_CONFIG_PATH=C:\OSGeo4W\lib\pkgconfig" >> $env:GITHUB_ENV
     
     - name: Build
       run: cargo build --release --verbose
@@ -64,35 +69,19 @@ jobs:
       if: matrix.os != 'windows-latest'
       run: |
         cd target/release
-        tar czvf ${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+        tar czvf ../../${{ matrix.asset_name }} ${{ matrix.artifact_name }}
         
     - name: Compress artifacts (Windows)
       if: matrix.os == 'windows-latest'
       run: |
         cd target/release
-        7z a ${{ matrix.asset_name }}.zip ${{ matrix.artifact_name }}
+        7z a ../../${{ matrix.asset_name }} ${{ matrix.artifact_name }}
     
-    - name: Upload artifacts (Unix)
-      if: matrix.os != 'windows-latest'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload Release Asset
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: target/release/${{ matrix.asset_name }}.tar.gz
-        asset_name: ${{ matrix.asset_name }}.tar.gz
-        asset_content_type: application/gzip
-        
-    - name: Upload artifacts (Windows)
-      if: matrix.os == 'windows-latest'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: target/release/${{ matrix.asset_name }}.zip
-        asset_name: ${{ matrix.asset_name }}.zip
-        asset_content_type: application/zip
+        files: ${{ matrix.asset_name }}
+        tag_name: ${{ github.event.release.tag_name || github.event.inputs.tag_name }}
 
   # Separate job for ARM build
   build-arm:
@@ -142,4 +131,10 @@ jobs:
         
         # Compress the binary
         cd output
-        tar czvf raster-calc-$
+        tar czvf ../raster-calc-linux-aarch64.tar.gz raster-calc
+    
+    - name: Upload Release Asset
+      uses: softprops/action-gh-release@v1
+      with:
+        files: raster-calc-linux-aarch64.tar.gz
+        tag_name: ${{ github.event.release.tag_name || github.event.inputs.tag_name }}
