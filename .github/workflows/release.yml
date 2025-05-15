@@ -1,0 +1,81 @@
+name: Build and Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: raster-calc
+            asset_name: raster-calc-${{ github.ref_name }}-linux-x86_64
+          - os: windows-latest
+            artifact_name: raster-calc.exe
+            asset_name: raster-calc-${{ github.ref_name }}-windows-x86_64
+          - os: macos-latest
+            artifact_name: raster-calc
+            asset_name: raster-calc-${{ github.ref_name }}-macos-x86_64
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install GDAL (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgdal-dev gdal-bin
+    
+    - name: Install GDAL (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install gdal
+    
+    - name: Install GDAL (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install gdal
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Build
+      run: cargo build --release
+    
+    - name: Compress artifacts (Unix)
+      if: matrix.os != 'windows-latest'
+      run: |
+        cd target/release
+        tar czvf ${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+        
+    - name: Compress artifacts (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd target/release
+        7z a ${{ matrix.asset_name }}.zip ${{ matrix.artifact_name }}
+    
+    - name: Upload artifacts (Unix)
+      if: matrix.os != 'windows-latest'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: target/release/${{ matrix.asset_name }}.tar.gz
+        asset_name: ${{ matrix.asset_name }}.tar.gz
+        asset_content_type: application/gzip
+        
+    - name: Upload artifacts (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: target/release/${{ matrix.asset_name }}.zip
+        asset_name: ${{ matrix.asset_name }}.zip
+        asset_content_type: application/zip
