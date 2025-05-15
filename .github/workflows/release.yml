@@ -3,7 +3,7 @@ name: Build and Release
 on:
   release:
     types: [created]
-  workflow_dispatch:  # Allows manual triggering of the workflow
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,6 +13,7 @@ jobs:
     name: Build ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false  # Allow other builds to continue if one fails
       matrix:
         include:
           - os: ubuntu-latest
@@ -42,13 +43,22 @@ jobs:
     - name: Install GDAL (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        choco install gdal
+        # Download and install OSGeo4W which includes GDAL
+        curl -L -o osgeo4w-setup.exe https://download.osgeo.org/osgeo4w/v2/osgeo4w-setup.exe
+        .\osgeo4w-setup.exe --quiet-mode --no-desktop --no-startmenu --no-shortcuts --upgrade-also --site http://download.osgeo.org/osgeo4w/v2 --packages gdal
+        echo "GDAL_HOME=C:\OSGeo4W" >> $env:GITHUB_ENV
+        echo "C:\OSGeo4W\bin" >> $env:GITHUB_PATH
     
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
     
+    - name: Set PKG_CONFIG_PATH (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        echo "PKG_CONFIG_PATH=C:\OSGeo4W\lib\pkgconfig" >> $env:GITHUB_ENV
+    
     - name: Build
-      run: cargo build --release
+      run: cargo build --release --verbose
     
     - name: Compress artifacts (Unix)
       if: matrix.os != 'windows-latest'
