@@ -253,14 +253,17 @@ impl ParallelProcessor {
             let needs_scaling =
                 calculator.needs_input_scaling() && (input_scale_factor - 1.0).abs() > f32::EPSILON;
 
-            if needs_scaling {
-                // Scale input data for indices that need it (EVI, SAVI, MSAVI2, OSAVI)
+            println!("🔍 DEBUG: Calculator={}, needs_input_scaling={}, input_scale_factor={}, needs_scaling={}", 
+             calculator.name(), calculator.needs_input_scaling(), input_scale_factor, needs_scaling);
+
+             if needs_scaling {
                 for buffer in &mut inputs {
-                    if let TypedBuffer::F32(buf) = buffer {
-                        let data = buf.data_mut();
-                        for value in data {
+                    if let TypedBuffer::F32(ref mut buf) = buffer {
+                        println!("BEFORE scaling: First 3 values: {:?}", &buf.data()[0..3.min(buf.data().len())]);
+                        for value in buf.data_mut() {
                             *value /= input_scale_factor;
                         }
+                        println!("AFTER scaling: First 3 values: {:?}", &buf.data()[0..3.min(buf.data().len())]);
                     }
                 }
             }
@@ -321,7 +324,7 @@ impl ParallelProcessor {
         output_path: &str,
         use_fixed_point: bool,
         scale_factor: i32,
-        input_scale_factor: f32,  // NEW PARAMETER
+        input_scale_factor: f32, // NEW PARAMETER
         width: usize,
         height: usize,
         compress: &str,
@@ -346,13 +349,19 @@ impl ParallelProcessor {
             calculator.needs_input_scaling() && (input_scale_factor - 1.0).abs() > f32::EPSILON;
 
         if needs_scaling {
-            // Scale input data for indices that need it (EVI, SAVI, MSAVI2, OSAVI)
             for buffer in &mut inputs {
-                if let TypedBuffer::F32(buf) = buffer {
-                    let data = buf.data_mut();
-                    for value in data {
+                if let TypedBuffer::F32(ref mut buf) = buffer {
+                    println!(
+                        "BEFORE scaling: First 3 values: {:?}",
+                        &buf.data()[0..3.min(buf.data().len())]
+                    );
+                    for value in buf.data_mut() {
                         *value /= input_scale_factor;
                     }
+                    println!(
+                        "AFTER scaling: First 3 values: {:?}",
+                        &buf.data()[0..3.min(buf.data().len())]
+                    );
                 }
             }
         }
