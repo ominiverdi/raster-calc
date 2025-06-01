@@ -105,21 +105,121 @@ else
     echo "Skipping NDWI tests - required bands not available"
 fi
 
-# NDSI tests (float32 and int16)
+# NDSI tests (float32 and int16) - FIXED: Use same resolution bands
 if [ -n "$BAND_GREEN" ] && [ -n "$BAND_SWIR" ]; then
-    echo -e "\nTesting NDSI (float32)..."
-    time ../target/release/raster-calc ndsi \
-      -a "$BAND_GREEN" \
-      -b "$BAND_SWIR" \
-      -o "${OUTPUT_DIR}/ndsi_large_float.tif" --float
+    # Use 20m resolution for both bands to avoid size mismatch
+    BAND_GREEN_20M="${SENTINEL_DATA_DIR}/T33TTG_20250305T100029_B03_20m.jp2"
+    
+    if [ -f "$BAND_GREEN_20M" ]; then
+        echo -e "\nTesting NDSI (float32)..."
+        time ../target/release/raster-calc ndsi \
+          -a "$BAND_GREEN_20M" \
+          -b "$BAND_SWIR" \
+          -o "${OUTPUT_DIR}/ndsi_large_float.tif" --float
 
-    echo -e "\nTesting NDSI (int16)..."
-    time ../target/release/raster-calc ndsi \
-      -a "$BAND_GREEN" \
-      -b "$BAND_SWIR" \
-      -o "${OUTPUT_DIR}/ndsi_large_int16.tif"
+        echo -e "\nTesting NDSI (int16)..."
+        time ../target/release/raster-calc ndsi \
+          -a "$BAND_GREEN_20M" \
+          -b "$BAND_SWIR" \
+          -o "${OUTPUT_DIR}/ndsi_large_int16.tif"
+    else
+        echo "Skipping NDSI tests - B03_20m not available"
+    fi
 else
     echo "Skipping NDSI tests - required bands not available"
+fi
+
+# Input scaling tests for indices that need it
+echo -e "\n=== INPUT SCALING TESTS ==="
+
+# EVI with input scaling (L2A correction)
+if [ -n "$BAND_NIR" ] && [ -n "$BAND_RED" ] && [ -n "$BAND_BLUE" ]; then
+    echo -e "\nTesting EVI with L2A input scaling (float32)..."
+    time ../target/release/raster-calc evi \
+      -a "$BAND_NIR" \
+      -b "$BAND_RED" \
+      -c "$BAND_BLUE" \
+      --input-scale-factor 10000 \
+      -o "${OUTPUT_DIR}/evi_scaled_float.tif" --float
+
+    echo -e "\nTesting EVI with L2A input scaling (int16)..."
+    time ../target/release/raster-calc evi \
+      -a "$BAND_NIR" \
+      -b "$BAND_RED" \
+      -c "$BAND_BLUE" \
+      --input-scale-factor 10000 \
+      -o "${OUTPUT_DIR}/evi_scaled_int16.tif"
+else
+    echo "Skipping EVI scaling tests - required bands not available"
+fi
+
+# SAVI with input scaling (L2A correction)
+if [ -n "$BAND_NIR" ] && [ -n "$BAND_RED" ]; then
+    echo -e "\nTesting SAVI with L2A input scaling (float32)..."
+    time ../target/release/raster-calc savi \
+      -a "$BAND_NIR" \
+      -b "$BAND_RED" \
+      --input-scale-factor 10000 \
+      -o "${OUTPUT_DIR}/savi_scaled_float.tif" --float
+
+    echo -e "\nTesting SAVI with L2A input scaling (int16)..."
+    time ../target/release/raster-calc savi \
+      -a "$BAND_NIR" \
+      -b "$BAND_RED" \
+      --input-scale-factor 10000 \
+      -o "${OUTPUT_DIR}/savi_scaled_int16.tif"
+else
+    echo "Skipping SAVI scaling tests - required bands not available"
+fi
+
+# MSAVI2 with input scaling (L2A correction)
+if [ -n "$BAND_NIR" ] && [ -n "$BAND_RED" ]; then
+    echo -e "\nTesting MSAVI2 with L2A input scaling (float32)..."
+    time ../target/release/raster-calc msavi2 \
+      -a "$BAND_NIR" \
+      -b "$BAND_RED" \
+      --input-scale-factor 10000 \
+      -o "${OUTPUT_DIR}/msavi2_scaled_float.tif" --float
+
+    echo -e "\nTesting MSAVI2 with L2A input scaling (int16)..."
+    time ../target/release/raster-calc msavi2 \
+      -a "$BAND_NIR" \
+      -b "$BAND_RED" \
+      --input-scale-factor 10000 \
+      -o "${OUTPUT_DIR}/msavi2_scaled_int16.tif"
+else
+    echo "Skipping MSAVI2 scaling tests - required bands not available"
+fi
+
+# OSAVI with input scaling (L2A correction)
+if [ -n "$BAND_NIR" ] && [ -n "$BAND_RED" ]; then
+    echo -e "\nTesting OSAVI with L2A input scaling (float32)..."
+    time ../target/release/raster-calc osavi \
+      -a "$BAND_NIR" \
+      -b "$BAND_RED" \
+      --input-scale-factor 10000 \
+      -o "${OUTPUT_DIR}/osavi_scaled_float.tif" --float
+
+    echo -e "\nTesting OSAVI with L2A input scaling (int16)..."
+    time ../target/release/raster-calc osavi \
+      -a "$BAND_NIR" \
+      -b "$BAND_RED" \
+      --input-scale-factor 10000 \
+      -o "${OUTPUT_DIR}/osavi_scaled_int16.tif"
+else
+    echo "Skipping OSAVI scaling tests - required bands not available"
+fi
+
+# NDI scaling test (should give identical results with/without scaling)
+if [ -n "$BAND_NIR" ] && [ -n "$BAND_RED" ]; then
+    echo -e "\nTesting NDI scaling verification (should be identical to regular NDVI)..."
+    time ../target/release/raster-calc ndi \
+      -a "$BAND_NIR" \
+      -b "$BAND_RED" \
+      --input-scale-factor 10000 \
+      -o "${OUTPUT_DIR}/ndvi_scaling_test.tif" --float
+else
+    echo "Skipping NDI scaling test - required bands not available"
 fi
 
 # BSI tests (float32 and int16)

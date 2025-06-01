@@ -38,6 +38,7 @@ impl IndexCalculator for MSAVI2 {
                 let mut result_data = vec![0.0f32; shape.0 * shape.1];
                 
                 // Calculate MSAVI2 in parallel
+                // NOTE: Input scaling should be applied by the processor before calling this
                 result_data.par_iter_mut().enumerate().for_each(|(i, result)| {
                     let nir_val = nir_band[i];
                     let red_val = red_band[i];
@@ -79,5 +80,9 @@ impl IndexCalculator for MSAVI2 {
     
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn needs_input_scaling(&self) -> bool {
+        true // MSAVI2 has constants (1, 2, 8) that require proper reflectance values
     }
 }

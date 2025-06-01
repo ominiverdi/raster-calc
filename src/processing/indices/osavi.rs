@@ -41,6 +41,7 @@ impl IndexCalculator for OSAVI {
                 const L: f32 = 0.16;
                 
                 // Calculate OSAVI in parallel
+                // NOTE: Input scaling should be applied by the processor before calling this
                 result_data.par_iter_mut().enumerate().for_each(|(i, result)| {
                     let nir_val = nir_band[i];
                     let red_val = red_band[i];
@@ -69,5 +70,9 @@ impl IndexCalculator for OSAVI {
     
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn needs_input_scaling(&self) -> bool {
+        true // OSAVI has constant L=0.16 that requires proper reflectance values
     }
 }

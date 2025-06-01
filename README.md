@@ -96,6 +96,15 @@ raster-calc batch -c batch_config.json
 
 # For Sentinel-2 specifically:
 raster-calc ndi -a B08.jp2 -b B04.jp2 -o ndvi.tif
+
+# EVI with L2A data (scaling required)
+raster-calc evi -a B08_L2A.jp2 -b B04_L2A.jp2 -c B02_L2A.jp2 --input-scale-factor 10000 -o evi.tif
+
+# SAVI with L2A data (scaling required)
+raster-calc savi -a B08_L2A.jp2 -b B04_L2A.jp2 --input-scale-factor 10000 -l 0.5 -o savi.tif
+
+# For TOA (Top of Atmosphere) data - no scaling needed for any index
+raster-calc evi -a B08_TOA.jp2 -b B04_TOA.jp2 -c B02_TOA.jp2 -o evi.tif
 ```
 
 ## Batch Processing
@@ -206,6 +215,7 @@ OPTIONS:
     -o, --output <FILE>             Output file path [default: output.tif]
     --float                         Use float32 instead of int16
     --scale-factor <VALUE>          Scaling factor for fixed-point [default: 10000]
+    --input-scale-factor <VALUE>    Input scaling factor (for L2A data use 10000, for TOA use 1) [default: 1.0]
     --compress <TYPE>               Compression type: NONE, DEFLATE, LZW, ZSTD [default: DEFLATE]
     --compress-level <LEVEL>        Compression level (1-9 for DEFLATE, 1-22 for ZSTD) [default: 6]
     --tiled <BOOL>                  Use tiled output [default: true]
@@ -226,6 +236,68 @@ SUBCOMMANDS:
     help                            Print this message or help for a subcommand
 ```
 
+
+# Input Scaling for L2A Data
+
+When working with Sentinel-2 L2A (Bottom of Atmosphere) or other pre-processed satellite data, reflectance values are often stored as scaled integers (typically scaled by 10,000). For indices with constants like EVI, SAVI, MSAVI2, and OSAVI, you need to convert these back to actual reflectance values (0-1 range) using the `--input-scale-factor` parameter.
+
+## Which Indices Need Input Scaling?
+
+| Index | Needs Scaling | Reason |
+|-------|---------------|---------|
+| NDI/NDVI | ❌ No | Pure ratio - scaling cancels out |
+| NDWI | ❌ No | Pure ratio - scaling cancels out |
+| NDSI | ❌ No | Pure ratio - scaling cancels out |
+| BSI | ❌ No | Pure ratio - scaling cancels out |
+| EVI | ✅ Yes | Contains constants (1.0, 6.0, 7.5) |
+| SAVI | ✅ Yes | Contains soil factor L (typically 0.5) |
+| MSAVI2 | ✅ Yes | Contains constants (1, 2, 8) |
+| OSAVI | ✅ Yes | Contains constant (0.16) |
+
+
+## Batch Processing with Input Scaling
+
+```json
+{
+  "global": {
+    "input_scale_factor": 10000,
+    "compress": "DEFLATE",
+    "float": true
+  },
+  "operations": [
+    {
+      "type": "ndi",
+      "params": { "a": "B08_L2A.jp2", "b": "B04_L2A.jp2" },
+      "output": "ndvi.tif"
+    },
+    {
+      "type": "evi", 
+      "params": { "a": "B08_L2A.jp2", "b": "B04_L2A.jp2", "c": "B02_L2A.jp2" },
+      "output": "evi.tif"
+    },
+    {
+      "type": "savi",
+      "params": { "a": "B08_TOA.jp2", "b": "B04_TOA.jp2" },
+      "output": "savi_toa.tif",
+      "input_scale_factor": 1.0
+    }
+  ]
+}
+```
+
+
+
+## Common Data Types and Scale Factors
+
+| Data Type | Typical Scale Factor | Example |
+|-----------|---------------------|---------|
+| Sentinel-2 L2A | 10000 | `--input-scale-factor 10000` |
+| Sentinel-2 L1C (TOA) | 10000 | `--input-scale-factor 10000` |
+| Landsat Collection 2 L2 | 10000 | `--input-scale-factor 10000` |
+| Already converted reflectance | 1 | `--input-scale-factor 1` (default) |
+| Custom scaling | varies | `--input-scale-factor <your_scale>` |
+
+
 ## Author
 
 Lorenzo Becchi
@@ -233,3 +305,6 @@ Lorenzo Becchi
 ## License
 
 MIT License - See LICENSE file for details
+
+
+

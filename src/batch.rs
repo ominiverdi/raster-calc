@@ -32,6 +32,8 @@ pub struct GlobalParams {
     pub float: bool,
     #[serde(default = "default_scale_factor")]
     pub scale_factor: i32,
+    #[serde(default = "default_input_scale_factor")]
+    pub input_scale_factor: f32,  // NEW FIELD
     #[serde(default = "default_true")]
     pub tiled: bool,
     #[serde(default)]
@@ -62,6 +64,7 @@ pub struct Operation {
     pub output: String,
     pub float: Option<bool>,
     pub scale_factor: Option<i32>,
+    pub input_scale_factor: Option<f32>,
     pub compress: Option<String>,
     pub compress_level: Option<u8>,
     pub tiled: Option<bool>,
@@ -169,6 +172,7 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
         // Get operation parameters
         let float = op.float.unwrap_or(config.global.float);
         let scale_factor = op.scale_factor.unwrap_or(config.global.scale_factor);
+        let input_scale_factor = op.input_scale_factor.unwrap_or(config.global.input_scale_factor);  // NEW LINE
         let compress = op.compress.as_deref().unwrap_or(&config.global.compress);
         let compress_level = op.compress_level.unwrap_or(config.global.compress_level);
         let tiled = op.tiled.unwrap_or(config.global.tiled);
@@ -180,7 +184,7 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
                     Ok(p) => {
                         let alg = NDI::new(0, 1, None);
                         processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
-                                       compress, compress_level, tiled)
+                                       input_scale_factor, compress, compress_level, tiled)  // ADDED input_scale_factor
                     },
                     Err(e) => {
                         let mut error_list = errors.lock().unwrap();
@@ -194,7 +198,7 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
                     Ok(p) => {
                         let alg = EVI::new(0, 1, 2, None);
                         processor.process(alg, &[p.a, p.b, p.c], &op.output, !float, scale_factor, 
-                                       compress, compress_level, tiled)
+                                       input_scale_factor, compress, compress_level, tiled)  // ADDED input_scale_factor
                     },
                     Err(e) => {
                         let mut error_list = errors.lock().unwrap();
@@ -208,7 +212,7 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
                     Ok(p) => {
                         let alg = SAVI::new(0, 1, p.l.unwrap_or(0.5), None);
                         processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
-                                       compress, compress_level, tiled)
+                                       input_scale_factor, compress, compress_level, tiled)  // ADDED input_scale_factor
                     },
                     Err(e) => {
                         let mut error_list = errors.lock().unwrap();
@@ -222,7 +226,7 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
                     Ok(p) => {
                         let alg = NDWI::new(0, 1, None);
                         processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
-                                       compress, compress_level, tiled)
+                                       input_scale_factor, compress, compress_level, tiled)  // ADDED input_scale_factor
                     },
                     Err(e) => {
                         let mut error_list = errors.lock().unwrap();
@@ -236,7 +240,7 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
                     Ok(p) => {
                         let alg = NDSI::new(0, 1, None);
                         processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
-                                       compress, compress_level, tiled)
+                                       input_scale_factor, compress, compress_level, tiled)  // ADDED input_scale_factor
                     },
                     Err(e) => {
                         let mut error_list = errors.lock().unwrap();
@@ -250,7 +254,7 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
                     Ok(p) => {
                         let alg = BSI::new(0, 1, 2, 3, None);
                         processor.process(alg, &[p.s, p.r, p.n, p.b], &op.output, !float, scale_factor, 
-                                       compress, compress_level, tiled)
+                                       input_scale_factor, compress, compress_level, tiled)  // ADDED input_scale_factor
                     },
                     Err(e) => {
                         let mut error_list = errors.lock().unwrap();
@@ -264,7 +268,7 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
                     Ok(p) => {
                         let alg = MSAVI2::new(0, 1, None);
                         processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
-                                       compress, compress_level, tiled)
+                                       input_scale_factor, compress, compress_level, tiled)  // ADDED input_scale_factor
                     },
                     Err(e) => {
                         let mut error_list = errors.lock().unwrap();
@@ -278,7 +282,7 @@ pub fn process_batch(config_path: &PathBuf) -> Result<()> {
                     Ok(p) => {
                         let alg = OSAVI::new(0, 1, None);
                         processor.process(alg, &[p.a, p.b], &op.output, !float, scale_factor, 
-                                       compress, compress_level, tiled)
+                                       input_scale_factor, compress, compress_level, tiled)  // ADDED input_scale_factor
                     },
                     Err(e) => {
                         let mut error_list = errors.lock().unwrap();
@@ -375,4 +379,9 @@ fn collect_unique_paths(config: &BatchConfig) -> HashSet<String> {
     }
 
     paths
+}
+
+
+fn default_input_scale_factor() -> f32 {
+    1.0  // NEW DEFAULT FUNCTION
 }

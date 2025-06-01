@@ -47,6 +47,7 @@ impl IndexCalculator for EVI {
                 const C2: f32 = 7.5;   // Coefficient for the aerosol resistance (blue band)
                 
                 // Calculate EVI in parallel
+                // NOTE: Input scaling should be applied by the processor before calling this
                 result_data.par_iter_mut().enumerate().for_each(|(i, result)| {
                     let nir_val = nir_band[i];
                     let red_val = red_band[i];
@@ -81,5 +82,9 @@ impl IndexCalculator for EVI {
     
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn needs_input_scaling(&self) -> bool {
+        true // EVI has constants (L=1.0, C1=6.0, C2=7.5) that require proper reflectance values
     }
 }

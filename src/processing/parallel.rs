@@ -67,7 +67,7 @@ impl ParallelProcessor {
             0
         }
     }
-    
+
     pub fn clear_cache(&self) {
         if let Some(cache) = &self.cache {
             cache.clear();
@@ -96,6 +96,7 @@ impl ParallelProcessor {
         output_path: &str,
         use_fixed_point: bool,
         scale_factor: i32,
+        input_scale_factor: f32, // NEW PARAMETER
         compress: &str,
         compress_level: u8,
         tiled: bool,
@@ -120,6 +121,7 @@ impl ParallelProcessor {
                 output_path,
                 use_fixed_point,
                 scale_factor,
+                input_scale_factor,
                 width,
                 height,
                 compress,
@@ -247,7 +249,21 @@ impl ParallelProcessor {
             for i in 0..blocks.len() {
                 inputs.push(blocks[&i].clone());
             }
+            // Apply input scaling if the calculator needs it and scaling factor is not 1.0
+            let needs_scaling =
+                calculator.needs_input_scaling() && (input_scale_factor - 1.0).abs() > f32::EPSILON;
 
+            if needs_scaling {
+                // Scale input data for indices that need it (EVI, SAVI, MSAVI2, OSAVI)
+                for buffer in &mut inputs {
+                    if let TypedBuffer::F32(buf) = buffer {
+                        let data = buf.data_mut();
+                        for value in data {
+                            *value /= input_scale_factor;
+                        }
+                    }
+                }
+            }
             // Calculate the index using the provided calculator
             let result = calculator.calculate(&inputs);
 
@@ -305,6 +321,7 @@ impl ParallelProcessor {
         output_path: &str,
         use_fixed_point: bool,
         scale_factor: i32,
+        input_scale_factor: f32,  // NEW PARAMETER
         width: usize,
         height: usize,
         compress: &str,
@@ -324,6 +341,21 @@ impl ParallelProcessor {
             inputs.push(TypedBuffer::F32(buffer));
         }
 
+        // Apply input scaling if the calculator needs it and scaling factor is not 1.0
+        let needs_scaling =
+            calculator.needs_input_scaling() && (input_scale_factor - 1.0).abs() > f32::EPSILON;
+
+        if needs_scaling {
+            // Scale input data for indices that need it (EVI, SAVI, MSAVI2, OSAVI)
+            for buffer in &mut inputs {
+                if let TypedBuffer::F32(buf) = buffer {
+                    let data = buf.data_mut();
+                    for value in data {
+                        *value /= input_scale_factor;
+                    }
+                }
+            }
+        }
         // Calculate the index
         let result = calculator.calculate(&inputs);
 
@@ -748,4 +780,11 @@ pub trait IndexCalculator: Send + Sync {
 
     /// Return the name of the index
     fn name(&self) -> &str;
+
+    /// Return true if this index requires input scaling for proper results
+    /// Indices with constants (EVI, SAVI, MSAVI2, OSAVI) need scaling
+    /// Pure ratio indices (NDI, NDWI, NDSI, BSI) do not need scaling
+    fn needs_input_scaling(&self) -> bool {
+        false // Default: most indices are pure ratios that don't need scaling
+    }
 }

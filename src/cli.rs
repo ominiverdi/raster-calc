@@ -16,9 +16,13 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub float: bool,
 
-    /// Scaling factor for fixed-point
+    /// Scaling factor for fixed-point output
     #[arg(long, default_value = "10000", global = true)]
     pub scale_factor: i32,
+
+    /// Input scaling factor (for L2A data use 10000, for TOA use 1)
+    #[arg(long, default_value = "1.0", global = true)]
+    pub input_scale_factor: f32,
 
     /// Compression type (NONE, DEFLATE, LZW, ZSTD)
     #[arg(long, default_value = "DEFLATE", global = true)]
@@ -35,7 +39,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Normalized Difference Index: (A-B)/(A+B)
+    /// Normalized Difference Index: (A-B)/(A+B) [Scaling: Not needed]
     Ndi {
         /// First band (A)
         #[arg(short = 'a', long)]
@@ -46,7 +50,7 @@ pub enum Commands {
         band_b: PathBuf,
     },
 
-    /// Enhanced Vegetation Index
+    /// Enhanced Vegetation Index [Scaling: Required for L2A data]
     Evi {
         /// NIR band (A)
         #[arg(short = 'a', long)]
@@ -61,7 +65,7 @@ pub enum Commands {
         blue: PathBuf,
     },
 
-    /// Soil Adjusted Vegetation Index
+    /// Soil Adjusted Vegetation Index [Scaling: Required for L2A data]
     Savi {
         /// NIR band (A)
         #[arg(short = 'a', long)]
@@ -76,7 +80,7 @@ pub enum Commands {
         soil_factor: f32,
     },
 
-    /// Normalized Difference Water Index: (GREEN-NIR)/(GREEN+NIR)
+    /// Normalized Difference Water Index: (GREEN-NIR)/(GREEN+NIR) [Scaling: Not needed]
     Ndwi {
         /// Green band (A)
         #[arg(short = 'a', long)]
@@ -87,7 +91,7 @@ pub enum Commands {
         nir: PathBuf,
     },
 
-    /// Normalized Difference Snow Index: (GREEN-SWIR)/(GREEN+SWIR)
+    /// Normalized Difference Snow Index: (GREEN-SWIR)/(GREEN+SWIR) [Scaling: Not needed]
     Ndsi {
         /// Green band (A)
         #[arg(short = 'a', long)]
@@ -98,7 +102,7 @@ pub enum Commands {
         swir: PathBuf,
     },
 
-    /// Bare Soil Index: ((SWIR+RED)-(NIR+BLUE))/((SWIR+RED)+(NIR+BLUE))
+    /// Bare Soil Index: ((SWIR+RED)-(NIR+BLUE))/((SWIR+RED)+(NIR+BLUE)) [Scaling: Not needed]
     Bsi {
         /// SWIR band - typically Sentinel-2 B11
         #[arg(short = 's', long)]
@@ -117,7 +121,7 @@ pub enum Commands {
         blue: PathBuf,
     },
 
-    /// Modified Soil Adjusted Vegetation Index 2
+    /// Modified Soil Adjusted Vegetation Index 2 [Scaling: Required for L2A data]
     Msavi2 {
         /// NIR band
         #[arg(short = 'a', long)]
@@ -128,7 +132,7 @@ pub enum Commands {
         red: PathBuf,
     },
 
-    /// Optimized Soil Adjusted Vegetation Index
+    /// Optimized Soil Adjusted Vegetation Index [Scaling: Required for L2A data]
     Osavi {
         /// NIR band
         #[arg(short = 'a', long)]
