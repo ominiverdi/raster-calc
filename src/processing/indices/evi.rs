@@ -21,7 +21,6 @@ impl EVI {
         }
     }
 }
-
 impl IndexCalculator for EVI {
     fn calculate(&self, inputs: &[TypedBuffer]) -> TypedBuffer {
         // Extract input bands
@@ -29,7 +28,6 @@ impl IndexCalculator for EVI {
         let red = &inputs[self.red_index];
         let blue = &inputs[self.blue_index];
         
-        // Handle different input types (focusing on f32 for now)
         match (nir, red, blue) {
             (TypedBuffer::F32(nir_data), TypedBuffer::F32(red_data), TypedBuffer::F32(blue_data)) => {
                 let shape = nir_data.shape();
@@ -37,41 +35,59 @@ impl IndexCalculator for EVI {
                 let red_band = red_data.data();
                 let blue_band = blue_data.data();
                 
-                // Preallocate result buffer
                 let mut result_data = vec![0.0f32; shape.0 * shape.1];
                 
-                // Constants for EVI calculation
+                // EVI coefficients from MODIS documentation
                 const G: f32 = 2.5;    // Gain factor
                 const L: f32 = 1.0;    // Soil adjustment factor
-                const C1: f32 = 6.0;   // Coefficient for the aerosol resistance (red band)
-                const C2: f32 = 7.5;   // Coefficient for the aerosol resistance (blue band)
+                const C1: f32 = 6.0;   // Aerosol resistance (red)
+                const C2: f32 = 7.5;   // Aerosol resistance (blue)
                 
-                // Calculate EVI in parallel
-                // NOTE: Input scaling should be applied by the processor before calling this
                 result_data.par_iter_mut().enumerate().for_each(|(i, result)| {
                     let nir_val = nir_band[i];
                     let red_val = red_band[i];
                     let blue_val = blue_band[i];
                     
-                    // Check for valid values
-                    *result = if nir_val > 0.0 || red_val > 0.0 || blue_val > 0.0 {
-                        let denominator = nir_val + C1 * red_val - C2 * blue_val + L;
-                        
-                        // Calculate EVI, handling possible division by zero
-                        if denominator.abs() > 1e-6 {
-                            G * (nir_val - red_val) / denominator
+                    // Basic sanity check - reject clearly invalid values
+                    if nir_val < -1000.0 || red_val < -1000.0 || blue_val < -1000.0 ||
+                       nir_val > 50000.0 || red_val > 50000.0 || blue_val > 50000.0 {
+                        *result = -999.0;
+                        return;
+                    }
+                    
+                    // Handle negative values (atmospheric correction artifacts)
+                    let nir_clean = nir_val.max(0.0);
+                    let red_clean = red_val.max(0.0);
+                    let blue_clean = blue_val.max(0.0);
+                    
+                    // Check for blue band saturation in the actual data range
+                    // For DN values, saturation threshold is much higher
+                    let blue_saturation_threshold = if blue_clean > 10.0 { 2000.0 } else { 0.25 };
+                    
+                    if blue_clean >= blue_saturation_threshold {
+                        // Use 2-band EVI backup formula
+                        let denominator_2band = nir_clean + 2.4 * red_clean + 1.0;
+                        *result = if denominator_2band > 1e-3 {
+                            let evi2 = G * (nir_clean - red_clean) / denominator_2band;
+                            evi2.max(-0.2).min(1.0)
                         } else {
-                            -999.0 // NoData value
-                        }
+                            -999.0
+                        };
                     } else {
-                        -999.0 // NoData value
-                    };
+                        // Use standard 3-band EVI
+                        let denominator = nir_clean + C1 * red_clean - C2 * blue_clean + L;
+                        *result = if denominator > 1e-3 {
+                            let evi = G * (nir_clean - red_clean) / denominator;
+                            // Clamp to valid EVI range [-0.2, 1.0]
+                            evi.max(-0.2).min(1.0)
+                        } else {
+                            -999.0
+                        };
+                    }
                 });
                 
-                // Return result as TypedBuffer
                 TypedBuffer::F32(gdal::raster::Buffer::new(shape, result_data))
             },
-            // Add support for other types as needed
             _ => panic!("Unsupported input types for EVI calculation"),
         }
     }

@@ -253,17 +253,17 @@ impl ParallelProcessor {
             let needs_scaling =
                 calculator.needs_input_scaling() && (input_scale_factor - 1.0).abs() > f32::EPSILON;
 
-            println!("🔍 DEBUG: Calculator={}, needs_input_scaling={}, input_scale_factor={}, needs_scaling={}", 
-             calculator.name(), calculator.needs_input_scaling(), input_scale_factor, needs_scaling);
+            // println!("🔍 DEBUG: Calculator={}, needs_input_scaling={}, input_scale_factor={}, needs_scaling={}", 
+            //  calculator.name(), calculator.needs_input_scaling(), input_scale_factor, needs_scaling);
 
              if needs_scaling {
                 for buffer in &mut inputs {
                     if let TypedBuffer::F32(ref mut buf) = buffer {
-                        println!("BEFORE scaling: First 3 values: {:?}", &buf.data()[0..3.min(buf.data().len())]);
+                        // println!("BEFORE scaling: First 3 values: {:?}", &buf.data()[0..3.min(buf.data().len())]);
                         for value in buf.data_mut() {
                             *value /= input_scale_factor;
                         }
-                        println!("AFTER scaling: First 3 values: {:?}", &buf.data()[0..3.min(buf.data().len())]);
+                        // println!("AFTER scaling: First 3 values: {:?}", &buf.data()[0..3.min(buf.data().len())]);
                     }
                 }
             }
@@ -351,17 +351,17 @@ impl ParallelProcessor {
         if needs_scaling {
             for buffer in &mut inputs {
                 if let TypedBuffer::F32(ref mut buf) = buffer {
-                    println!(
-                        "BEFORE scaling: First 3 values: {:?}",
-                        &buf.data()[0..3.min(buf.data().len())]
-                    );
+                    // println!(
+                    //     "BEFORE scaling: First 3 values: {:?}",
+                    //     &buf.data()[0..3.min(buf.data().len())]
+                    // );
                     for value in buf.data_mut() {
                         *value /= input_scale_factor;
                     }
-                    println!(
-                        "AFTER scaling: First 3 values: {:?}",
-                        &buf.data()[0..3.min(buf.data().len())]
-                    );
+                    // println!(
+                    //     "AFTER scaling: First 3 values: {:?}",
+                    //     &buf.data()[0..3.min(buf.data().len())]
+                    // );
                 }
             }
         }

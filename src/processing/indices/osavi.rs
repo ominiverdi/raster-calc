@@ -49,10 +49,11 @@ impl IndexCalculator for OSAVI {
                     // Calculate OSAVI: ((NIR - RED) / (NIR + RED + L)) * (1 + L)
                     let denominator = nir_val + red_val + L;
                     
-                    *result = if denominator.abs() > 1e-6 {
-                        ((nir_val - red_val) / denominator) * (1.0 + L)
+                    *result = if denominator.abs() > 1e-3 {
+                        let osavi = ((nir_val - red_val) / denominator) * (1.0 + L);  // Missing (1+L) factor!
+                        osavi.max(-1.0).min(1.0)
                     } else {
-                        -999.0 // NoData value
+                        -999.0
                     };
                 });
                 

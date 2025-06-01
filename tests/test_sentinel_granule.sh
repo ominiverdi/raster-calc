@@ -18,12 +18,12 @@ echo "=========================================="
 # Define expected ranges for each index
 declare -A EXPECTED_RANGES
 EXPECTED_RANGES[ndvi]="-1.0 1.0"
-EXPECTED_RANGES[evi]="-1.0 1.0"
+EXPECTED_RANGES[evi]="-0.2 1.0"    
 EXPECTED_RANGES[savi]="-1.0 1.0"
 EXPECTED_RANGES[ndwi]="-1.0 1.0"
 EXPECTED_RANGES[ndsi]="-1.0 1.0"
 EXPECTED_RANGES[bsi]="-1.0 1.0"
-EXPECTED_RANGES[msavi2]="0.0 1.0"
+EXPECTED_RANGES[msavi2]="0.0 1.0"  
 EXPECTED_RANGES[osavi]="-1.0 1.0"
 
 # Define typical vegetation/feature ranges
@@ -378,8 +378,8 @@ echo "- EXPECTED_DIFF: Results differ as expected (indices with constants)"
 echo ""
 echo "EXPECTED RANGES:"
 for index in ndvi evi savi ndwi ndsi bsi msavi2 osavi; do
-    local expected=(${EXPECTED_RANGES[$index]})
-    local typical=(${TYPICAL_RANGES[$index]})
+    expected=(${EXPECTED_RANGES[$index]})
+    typical=(${TYPICAL_RANGES[$index]})
     printf "%-8s: Theoretical [%4.1f, %4.1f], Typical [%4.1f, %4.1f]\n" \
         "${index^^}" "${expected[0]}" "${expected[1]}" "${typical[0]}" "${typical[1]}"
 done

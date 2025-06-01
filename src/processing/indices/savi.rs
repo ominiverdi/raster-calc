@@ -50,10 +50,11 @@ impl IndexCalculator for SAVI {
                     // Calculate SAVI: ((NIR - RED) / (NIR + RED + L)) * (1 + L)
                     let denominator = nir_val + red_val + l;
                     
-                    *result = if denominator.abs() > 1e-6 {
-                        ((nir_val - red_val) / denominator) * (1.0 + l)
+                    *result = if denominator.abs() > 1e-3 {
+                        let savi = ((nir_val - red_val) / denominator) * (1.0 + l);
+                        savi.max(-1.0).min(1.0)  // Proper bounds
                     } else {
-                        -999.0 // NoData value
+                        -999.0
                     };
                 });
                 
