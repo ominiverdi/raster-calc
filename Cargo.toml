@@ -32,11 +32,3 @@ path = "src/lib.rs"
 [[bin]]
 name = "raster-calc"
 path = "src/main.rs"
-
-
-[dev-dependencies]
-criterion = "0.5"
-
-[[bench]]
-name = "benchmark"
-harness = false

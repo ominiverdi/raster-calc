@@ -4,6 +4,7 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(name = "raster-calc")]
 #[command(about = "High-performance spectral index calculator")]
+#[command(version = env!("CARGO_PKG_VERSION"))] 
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
