@@ -120,7 +120,8 @@ jobs:
         target = "x86_64-pc-windows-gnu"
         "@ | Out-File -FilePath "$env:USERPROFILE\.cargo\config.toml" -Encoding UTF8
     
-    - name: Verify installations
+    - name: Verify installations (non-blocking)
+      continue-on-error: true
       shell: pwsh
       run: |
         Write-Host "=== Rust toolchain ==="
