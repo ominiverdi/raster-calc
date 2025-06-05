@@ -177,17 +177,40 @@ jobs:
           # Force bindgen to use MSYS2 clang and toolchain exclusively
           echo "LIBCLANG_PATH=C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           echo "BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-w64-mingw32 --sysroot=C:\msys64\mingw64 -nostdinc -isystem C:\msys64\mingw64\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      
+      - name: Verify GDAL libraries
+        shell: pwsh  
+        run: |
+          Write-Host "=== Checking GDAL libraries ==="
+          if (Test-Path "C:\msys64\mingw64\lib") {
+            Write-Host "GDAL-related files in lib directory:"
+            Get-ChildItem "C:\msys64\mingw64\lib" | Where-Object Name -like "*gdal*" | Select-Object Name, Length
+            Write-Host "All .dll.a files:"
+            Get-ChildItem "C:\msys64\mingw64\lib" -Name "*.dll.a" | Where-Object { $_ -like "*gdal*" }
+            Write-Host "All .a files:"  
+            Get-ChildItem "C:\msys64\mingw64\lib" -Name "*.a" | Where-Object { $_ -like "*gdal*" }
+          }
+          
+          if (Test-Path "C:\msys64\mingw64\bin") {
+            Write-Host "GDAL DLLs in bin directory:"
+            Get-ChildItem "C:\msys64\mingw64\bin" -Name "*.dll" | Where-Object { $_ -like "*gdal*" }
+          }
 
       - name: Build
         shell: pwsh
         run: |
           Write-Host "=== Starting build ==="
-        
+          
           # Set environment for this step
           $env:PKG_CONFIG_PATH = $env:PKG_CONFIG_PATH
           
           # Try to bypass bindgen issues by using docs.rs mode
           $env:DOCS_RS = "1"
+          
+          # Ensure linker can find GDAL library and dependencies
+          $env:LIBRARY_PATH = "C:\msys64\mingw64\lib"
+          $env:LD_LIBRARY_PATH = "C:\msys64\mingw64\lib"
+          $env:PATH = "C:\msys64\mingw64\bin;$env:PATH"
           
           # Build normally
           cargo build --release --target x86_64-pc-windows-gnu --verbose
