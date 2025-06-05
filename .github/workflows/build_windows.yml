@@ -18,169 +18,132 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install MSYS2 and GDAL
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            mingw-w64-x86_64-gdal
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-pkg-config
-            mingw-w64-x86_64-toolchain
-
-      - name: Verify GCC installation
-        shell: pwsh
-        run: |
-          Write-Host "=== Check if GCC files exist ==="
-          if (Test-Path "C:\msys64\mingw64\bin\gcc.exe") {
-            Write-Host "✅ gcc.exe found!"
-          } else {
-            Write-Host "❌ gcc.exe NOT found"
-            Write-Host "Force installing GCC toolchain..."
-            C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pacman -S --noconfirm --overwrite '*' mingw-w64-x86_64-gcc mingw-w64-x86_64-toolchain"
-          }
-
-      - name: Setup Rust with GNU toolchain
+      # Use the standard Windows development approach
+      - name: Setup Rust MSVC toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable-x86_64-pc-windows-gnu
+          toolchain: stable-x86_64-pc-windows-msvc
 
-      - name: Configure build environment
+      - name: Install GDAL via vcpkg
         shell: pwsh
         run: |
-          # Set up environment variables
-          echo "GDAL_HOME=C:\msys64\mingw64" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "GDAL_LIB_DIR=C:\msys64\mingw64\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "GDAL_INCLUDE_DIR=C:\msys64\mingw64\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "PKG_CONFIG_PATH=C:\msys64\mingw64\lib\pkgconfig" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "=== Installing GDAL via vcpkg (Windows standard) ==="
           
-          # Add MSYS2 to PATH
-          echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Use GitHub's pre-installed vcpkg
+          $env:VCPKG_ROOT = "C:\vcpkg"
+          
+          # Install GDAL (this is the standard Windows approach)
+          & C:\vcpkg\vcpkg.exe install gdal:x64-windows
+          
+          # Set environment variables for build
+          $env:GDAL_HOME = "C:\vcpkg\installed\x64-windows"
+          echo "GDAL_HOME=C:\vcpkg\installed\x64-windows" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_LIB_DIR=C:\vcpkg\installed\x64-windows\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_INCLUDE_DIR=C:\vcpkg\installed\x64-windows\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          
+          # Add to PATH for runtime
+          echo "C:\vcpkg\installed\x64-windows\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Create Cargo config for GNU toolchain
+      - name: Verify GDAL installation
         shell: pwsh
         run: |
-          New-Item -Path "$env:USERPROFILE\.cargo" -ItemType Directory -Force
-          @"
-          [target.x86_64-pc-windows-gnu]
-          linker = "C:\\msys64\\mingw64\\bin\\gcc.exe"
-          ar = "C:\\msys64\\mingw64\\bin\\ar.exe"
-
-          [build]
-          target = "x86_64-pc-windows-gnu"
-          "@ | Out-File -FilePath "$env:USERPROFILE\.cargo\config.toml" -Encoding UTF8
-
-      - name: Fix GDAL library naming for gdal-sys
-        shell: pwsh
-        run: |
-          Write-Host "=== Fixing GDAL library naming ==="
-          if (Test-Path "C:\msys64\mingw64\lib\libgdal.dll.a") {
-            Copy-Item "C:\msys64\mingw64\lib\libgdal.dll.a" "C:\msys64\mingw64\lib\gdal_i.lib"
-            Write-Host "✅ Created gdal_i.lib for gdal-sys"
+          Write-Host "=== Verifying GDAL installation ==="
+          
+          # Check if GDAL files exist
+          $gdalLib = "C:\vcpkg\installed\x64-windows\lib\gdal.lib"
+          $gdalInclude = "C:\vcpkg\installed\x64-windows\include\gdal.h"
+          $gdalBin = "C:\vcpkg\installed\x64-windows\bin\gdal-config.exe"
+          
+          if (Test-Path $gdalLib) {
+            Write-Host "✅ GDAL library found: $gdalLib"
           } else {
-            Write-Host "❌ libgdal.dll.a not found!"
+            Write-Host "❌ GDAL library not found!"
+            exit 1
+          }
+          
+          if (Test-Path $gdalInclude) {
+            Write-Host "✅ GDAL headers found: $gdalInclude"
+          } else {
+            Write-Host "❌ GDAL headers not found!"
             exit 1
           }
 
-      - name: Try GNU build with system library preference
-        id: gnu_build
-        continue-on-error: true
+      - name: Build with MSVC
         shell: pwsh
         run: |
-          Write-Host "=== Attempting GNU build ==="
+          Write-Host "=== Building with MSVC (Windows standard) ==="
           
-          # Force system library preference (from Rust PR #67429)
-          $env:LIBRARY_PATH = "C:\msys64\mingw64\lib;$env:LIBRARY_PATH"
-          $env:RUSTFLAGS = "-L native=C:\msys64\mingw64\lib -C link-args=-Wl,--library-path,C:\msys64\mingw64\lib"
+          # Set GDAL environment
+          $env:GDAL_HOME = "C:\vcpkg\installed\x64-windows"
+          $env:GDAL_LIB_DIR = "C:\vcpkg\installed\x64-windows\lib"
+          $env:GDAL_INCLUDE_DIR = "C:\vcpkg\installed\x64-windows\include"
           
-          # Bypass bindgen
-          $env:DOCS_RS = "1"
-          
-          # Try static linking
-          $env:GDAL_STATIC = "1"
-          
-          # Build
-          cargo build --release --target x86_64-pc-windows-gnu --verbose
-          
-          # Check if binary exists
-          if (Test-Path "target\x86_64-pc-windows-gnu\release\raster-calc.exe") {
-            Write-Host "✅ GNU build successful!"
-            echo "BUILD_SUCCESS=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            echo "BINARY_PATH=target\x86_64-pc-windows-gnu\release\raster-calc.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
-            Write-Host "❌ GNU build failed - binary not created"
-            exit 1
-          }
-
-      - name: Fallback to MSVC build
-        if: steps.gnu_build.outcome == 'failure'
-        shell: pwsh
-        run: |
-          Write-Host "=== GNU build failed, trying MSVC fallback ==="
-          
-          # Install MSVC toolchain
-          rustup install stable-x86_64-pc-windows-msvc
-          rustup default stable-x86_64-pc-windows-msvc
-          
-          # Install GDAL via conda
-          Write-Host "Installing conda and GDAL..."
-          choco install miniconda3 -y --no-progress
-          $env:PATH = "C:\ProgramData\miniconda3\Scripts;C:\ProgramData\miniconda3\Library\bin;$env:PATH"
-          
-          # Install GDAL
-          conda install -c conda-forge gdal -y -q
-          
-          # Set GDAL environment for MSVC
-          $env:GDAL_HOME = "C:\ProgramData\miniconda3\Library"
-          $env:GDAL_LIB_DIR = "C:\ProgramData\miniconda3\Library\lib"
-          $env:GDAL_INCLUDE_DIR = "C:\ProgramData\miniconda3\Library\include"
-          
-          # Create new Cargo config for MSVC
-          @"
-          [build]
-          target = "x86_64-pc-windows-msvc"
-          "@ | Out-File -FilePath "$env:USERPROFILE\.cargo\config.toml" -Encoding UTF8
-          
-          # Build with MSVC
+          # Build for MSVC target
           cargo build --release --target x86_64-pc-windows-msvc --verbose
           
-          # Check if binary exists
+          # Verify binary was created
           if (Test-Path "target\x86_64-pc-windows-msvc\release\raster-calc.exe") {
-            Write-Host "✅ MSVC build successful!"
-            echo "BUILD_SUCCESS=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            echo "BINARY_PATH=target\x86_64-pc-windows-msvc\release\raster-calc.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "✅ Build successful!"
           } else {
-            Write-Host "❌ MSVC build also failed"
+            Write-Host "❌ Build failed - binary not created"
             exit 1
           }
 
       - name: Test binary
-        if: env.BUILD_SUCCESS == 'true'
         shell: pwsh
         run: |
           Write-Host "=== Testing binary ==="
-          if (Test-Path $env:BINARY_PATH) {
-            & $env:BINARY_PATH --help
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "✅ Binary test successful"
-            } else {
-              Write-Host "❌ Binary test failed"
-            }
+          
+          # Add GDAL DLLs to PATH for testing
+          $env:PATH = "C:\vcpkg\installed\x64-windows\bin;$env:PATH"
+          
+          # Test the binary
+          $binary = "target\x86_64-pc-windows-msvc\release\raster-calc.exe"
+          & $binary --help
+          
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ Binary test successful!"
+          } else {
+            Write-Host "❌ Binary test failed"
+            exit 1
           }
 
       - name: Create release package
-        if: env.BUILD_SUCCESS == 'true'
         shell: pwsh
         run: |
           Write-Host "=== Creating release package ==="
-          Compress-Archive -Path $env:BINARY_PATH -DestinationPath "raster-calc-windows-x86_64.zip" -Force
-          Write-Host "✅ Package created"
+          
+          # Create a directory with the binary and required DLLs
+          New-Item -ItemType Directory -Path "release_package" -Force
+          
+          # Copy the binary
+          Copy-Item "target\x86_64-pc-windows-msvc\release\raster-calc.exe" "release_package\"
+          
+          # Copy required GDAL DLLs
+          $gdalBinDir = "C:\vcpkg\installed\x64-windows\bin"
+          Get-ChildItem "$gdalBinDir\*.dll" | ForEach-Object {
+            Copy-Item $_.FullName "release_package\"
+          }
+          
+          # Create zip package
+          Compress-Archive -Path "release_package\*" -DestinationPath "raster-calc-windows-x86_64.zip" -Force
+          
+          Write-Host "✅ Release package created"
+          
+          # Show package contents
+          Write-Host "Package contents:"
+          Get-ChildItem "release_package" | ForEach-Object { Write-Host "  $($_.Name)" }
 
       - name: Upload artifacts
-        if: env.BUILD_SUCCESS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: raster-calc-windows-x86_64
           path: raster-calc-windows-x86_64.zip
+
+      - name: Upload to release (if tag provided)
+        if: github.event.inputs.tag_name != 'test-build'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: raster-calc-windows-x86_64.zip
+          tag_name: ${{ github.event.inputs.tag_name }}
+          fail_on_unmatched_files: true
