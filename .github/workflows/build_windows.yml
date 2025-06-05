@@ -210,7 +210,31 @@ jobs:
             Get-ChildItem "C:\msys64\mingw64\lib" | Where-Object Name -like "*gdal*" | Select-Object Name
             exit 1
           }
-
+      - name: Force GDAL linking manually
+        shell: pwsh
+        run: |
+          # Force link GDAL manually via RUSTFLAGS
+          $env:RUSTFLAGS = "-L C:\msys64\mingw64\lib -l gdal -l stdc++"
+          $env:DOCS_RS = "1"
+          cargo build --release --target x86_64-pc-windows-gnu --verbose
+      - name: Fallback to MSVC build
+        if: failure()
+        shell: pwsh
+        run: |
+          # Switch to MSVC toolchain
+          rustup install stable-x86_64-pc-windows-msvc
+          rustup default stable-x86_64-pc-windows-msvc
+          
+          # Install GDAL via conda for MSVC
+          choco install miniconda3 -y
+          $env:PATH = "C:\ProgramData\miniconda3\Scripts;$env:PATH"
+          conda install -c conda-forge gdal -y
+          
+          # Set GDAL environment for MSVC
+          $env:GDAL_HOME = "C:\ProgramData\miniconda3\Library"
+          
+          # Build with MSVC target
+          cargo build --release --target x86_64-pc-windows-msvc    
       - name: Build
         shell: pwsh
         run: |
