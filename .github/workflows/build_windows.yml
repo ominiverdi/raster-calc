@@ -40,7 +40,7 @@ jobs:
             Write-Host "Force installing GCC toolchain..."
             C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pacman -S --noconfirm --overwrite '*' mingw-w64-x86_64-gcc mingw-w64-x86_64-toolchain"
           }
-          
+
       - name: Verify GDAL installation
         shell: pwsh
         run: |
@@ -169,6 +169,14 @@ jobs:
             C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --libs gdal"
             C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --cflags gdal"
           }
+      
+      - name: Fix bindgen environment  
+        shell: pwsh
+        run: |
+          Write-Host "=== Setting up bindgen environment ==="
+          # Force bindgen to use MSYS2 clang and toolchain exclusively
+          echo "LIBCLANG_PATH=C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-w64-mingw32 --sysroot=C:\msys64\mingw64 -nostdinc -isystem C:\msys64\mingw64\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build
         shell: pwsh
