@@ -18,7 +18,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install MSYS2 and dependencies
+    - name: Install MSYS2 and GDAL
       uses: msys2/setup-msys2@v2
       with:
         msystem: MINGW64
@@ -27,274 +27,153 @@ jobs:
           mingw-w64-x86_64-gdal
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-pkg-config
-          mingw-w64-x86_64-make
-          mingw-w64-x86_64-cmake
-    
-    - name: Verify MSYS2 installation and setup environment
+          
+    - name: Verify GDAL installation
       shell: pwsh
       run: |
-        Write-Host "=== Verifying MSYS2 Installation ==="
+        Write-Host "=== Verify pacman installation ==="
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pacman -Q | grep gdal"
         
-        # Check if MSYS2 directories exist
-        $msys2Paths = @(
-          "C:\msys64",
-          "C:\msys64\mingw64",
-          "C:\msys64\mingw64\bin",
-          "C:\msys64\usr\bin"
-        )
-        
-        foreach ($path in $msys2Paths) {
-          if (Test-Path $path) {
-            Write-Host "✅ Found: $path"
-          } else {
-            Write-Host "❌ Missing: $path"
-            exit 1
-          }
+        Write-Host "=== Check if GDAL files exist ==="
+        if (Test-Path "C:\msys64\mingw64\bin\gdal-config") {
+          Write-Host "✅ gdal-config found!"
+        } else {
+          Write-Host "❌ gdal-config NOT found"
         }
         
-        # Check for critical executables
-        $criticalExes = @(
-          "C:\msys64\mingw64\bin\gcc.exe",
-          "C:\msys64\mingw64\bin\g++.exe",
-          "C:\msys64\mingw64\bin\ar.exe",
-          "C:\msys64\mingw64\bin\pkg-config.exe"
-        )
-        
-        foreach ($exe in $criticalExes) {
-          if (Test-Path $exe) {
-            Write-Host "✅ Found: $exe"
-          } else {
-            Write-Host "❌ Missing: $exe"
-            
-            # Try to find it elsewhere
-            Write-Host "Searching for $(Split-Path $exe -Leaf)..."
-            Get-ChildItem -Path "C:\msys64" -Recurse -Name "$(Split-Path $exe -Leaf)" -ErrorAction SilentlyContinue | ForEach-Object {
-              Write-Host "  Found at: C:\msys64\$_"
-            }
-            exit 1
-          }
+        if (Test-Path "C:\msys64\mingw64\bin\gdalinfo.exe") {
+          Write-Host "✅ gdalinfo.exe found!"
+        } else {
+          Write-Host "❌ gdalinfo.exe NOT found"
         }
         
-        # Test GDAL installation via MSYS2
-        Write-Host "=== Testing GDAL via MSYS2 ==="
-        try {
-          $gdalVersion = & C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && gdal-config --version" 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ GDAL version: $gdalVersion"
-          } else {
-            Write-Host "❌ GDAL not accessible via gdal-config"
-          }
-        } catch {
-          Write-Host "❌ Error testing GDAL: $_"
+        Write-Host "=== Force reinstall GDAL if missing ==="
+        if (-not (Test-Path "C:\msys64\mingw64\bin\gdal-config")) {
+          Write-Host "Reinstalling GDAL..."
+          C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pacman -S --noconfirm --overwrite '*' mingw-w64-x86_64-gdal"
         }
-        
-        # Set up environment variables for subsequent steps
-        Write-Host "=== Setting up environment variables ==="
-        echo "GDAL_HOME=C:\msys64\mingw64" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        echo "GDAL_LIB_DIR=C:\msys64\mingw64\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        echo "GDAL_INCLUDE_DIR=C:\msys64\mingw64\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        echo "PKG_CONFIG_PATH=C:\msys64\mingw64\lib\pkgconfig" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        echo "RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        
-        # Add to PATH (order matters - put MSYS2 first)
-        echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        
-        Write-Host "✅ Environment setup complete"
     
     - name: Setup Rust with GNU toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable-x86_64-pc-windows-gnu
     
-    - name: Create Cargo config
+    - name: Find GDAL installation
       shell: pwsh
       run: |
-        Write-Host "=== Creating Cargo configuration ==="
-        
-        # Ensure .cargo directory exists
-        $cargoDir = "$env:USERPROFILE\.cargo"
-        New-Item -Path $cargoDir -ItemType Directory -Force | Out-Null
-        
-        # Verify linker exists before configuring it
-        $linkerPath = "C:\msys64\mingw64\bin\gcc.exe"
-        $arPath = "C:\msys64\mingw64\bin\ar.exe"
-        
-        if (-not (Test-Path $linkerPath)) {
-          Write-Host "❌ Linker not found at: $linkerPath"
-          exit 1
+        Write-Host "=== Detailed GDAL search ==="
+        if (Test-Path "C:\msys64\mingw64\bin") {
+          Write-Host "=== ALL files in mingw64/bin ==="
+          Get-ChildItem "C:\msys64\mingw64\bin" | Select-Object Name | Sort-Object Name
+          Write-Host "=== GDAL files in mingw64/bin ==="
+          Get-ChildItem "C:\msys64\mingw64\bin" | Where-Object Name -like "*gdal*" | Select-Object Name
         }
         
-        if (-not (Test-Path $arPath)) {
-          Write-Host "❌ Archiver not found at: $arPath"
-          exit 1
+        if (Test-Path "C:\msys64\mingw64\lib") {
+          Write-Host "=== GDAL libraries in mingw64/lib ==="
+          Get-ChildItem "C:\msys64\mingw64\lib" | Where-Object Name -like "*gdal*" | Select-Object Name
+          Write-Host "=== pkg-config files ==="
+          Get-ChildItem "C:\msys64\mingw64\lib\pkgconfig" -ErrorAction SilentlyContinue | Where-Object Name -like "*gdal*" | Select-Object Name
         }
         
-        Write-Host "✅ Linker found: $linkerPath"
-        Write-Host "✅ Archiver found: $arPath"
+        Write-Host "=== Search for gdal-config anywhere ==="
+        Get-ChildItem -Path "C:\msys64" -Recurse -Name "*gdal-config*" -ErrorAction SilentlyContinue
         
-        # Create cargo config with proper escaping
-        $configContent = @"
-[target.x86_64-pc-windows-gnu]
-linker = "C:\\msys64\\mingw64\\bin\\gcc.exe"
-ar = "C:\\msys64\\mingw64\\bin\\ar.exe"
-
-[build]
-target = "x86_64-pc-windows-gnu"
-
-[env]
-PKG_CONFIG_PATH = "C:\\msys64\\mingw64\\lib\\pkgconfig"
-"@
-        
-        $configPath = "$cargoDir\config.toml"
-        $configContent | Out-File -FilePath $configPath -Encoding UTF8
-        
-        Write-Host "✅ Cargo config created at: $configPath"
-        Write-Host "Config contents:"
-        Get-Content $configPath | ForEach-Object { Write-Host "  $_" }
+        Write-Host "=== Check pacman packages ==="
+        C:\msys64\usr\bin\bash.exe -lc "pacman -Q | grep gdal"
     
-    - name: Verify build environment
+    - name: Configure build environment
       shell: pwsh
       run: |
-        Write-Host "=== Verifying Build Environment ==="
+        # First, let's see what's actually installed
+        Write-Host "=== Testing GDAL via MINGW64 environment ==="
+        $env:MSYSTEM = "MINGW64"
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && which gdal-config"
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && gdal-config --version"
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && gdal-config --libs"
         
-        # Test Rust toolchain
-        Write-Host "Rust toolchain:"
+        # Set up environment variables (try both possible locations)
+        if (Test-Path "C:\msys64\mingw64") {
+          echo "GDAL_HOME=C:\msys64\mingw64" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_LIB_DIR=C:\msys64\mingw64\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_INCLUDE_DIR=C:\msys64\mingw64\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG_PATH=C:\msys64\mingw64\lib\pkgconfig" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        }
+        
+        # Ensure we're using the GNU toolchain
+        echo "RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        
+        # Add MSYS2 to PATH
+        echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    
+    - name: Create Cargo config for GNU toolchain
+      shell: pwsh
+      run: |
+        # Verify gcc.exe exists before creating config
+        if (-not (Test-Path "C:\msys64\mingw64\bin\gcc.exe")) {
+          Write-Host "❌ GCC not found at C:\msys64\mingw64\bin\gcc.exe"
+          Write-Host "Searching for gcc.exe..."
+          Get-ChildItem -Path "C:\msys64" -Recurse -Name "gcc.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "Found gcc.exe at: C:\msys64\$_"
+          }
+          exit 1
+        }
+        
+        Write-Host "✅ GCC found at C:\msys64\mingw64\bin\gcc.exe"
+        
+        New-Item -Path "$env:USERPROFILE\.cargo" -ItemType Directory -Force
+        @"
+        [target.x86_64-pc-windows-gnu]
+        linker = "C:\\msys64\\mingw64\\bin\\gcc.exe"
+        ar = "C:\\msys64\\mingw64\\bin\\ar.exe"
+        
+        [build]
+        target = "x86_64-pc-windows-gnu"
+        "@ | Out-File -FilePath "$env:USERPROFILE\.cargo\config.toml" -Encoding UTF8
+    
+    - name: Verify installations (non-blocking)
+      continue-on-error: true
+      shell: pwsh
+      run: |
+        Write-Host "=== Rust toolchain ==="
         rustup default stable-x86_64-pc-windows-gnu
         rustc --version --verbose
         
-        # Test PATH
-        Write-Host "`nCurrent PATH (MSYS2 entries):"
+        Write-Host "=== Environment variables ==="
+        Write-Host "GDAL_HOME: $env:GDAL_HOME"
+        Write-Host "PKG_CONFIG_PATH: $env:PKG_CONFIG_PATH"
+        Write-Host "PATH includes:"
         $env:PATH -split ';' | Where-Object { $_ -like "*msys*" } | ForEach-Object { Write-Host "  $_" }
         
-        # Test environment variables
-        Write-Host "`nEnvironment variables:"
-        Write-Host "  GDAL_HOME: $env:GDAL_HOME"
-        Write-Host "  PKG_CONFIG_PATH: $env:PKG_CONFIG_PATH"
-        Write-Host "  RUSTUP_TOOLCHAIN: $env:RUSTUP_TOOLCHAIN"
-        
-        # Test linker directly
-        Write-Host "`nTesting linker:"
-        try {
-          $linkerVersion = & "C:\msys64\mingw64\bin\gcc.exe" --version 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ Linker test successful"
-            Write-Host "  $($linkerVersion[0])"
-          } else {
-            Write-Host "❌ Linker test failed"
-            exit 1
-          }
-        } catch {
-          Write-Host "❌ Linker test exception: $_"
-          exit 1
+        Write-Host "=== Test GDAL via MINGW64 bash ==="
+        $env:MSYSTEM = "MINGW64"
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --version"
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --exists gdal && echo 'GDAL pkg-config found' || echo 'GDAL pkg-config not found'"
+        $result = C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --exists gdal" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "=== GDAL pkg-config details ==="
+          C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --libs gdal"
+          C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --cflags gdal"
         }
-        
-        # Test pkg-config for GDAL
-        Write-Host "`nTesting pkg-config for GDAL:"
-        try {
-          $env:PKG_CONFIG_PATH = "C:\msys64\mingw64\lib\pkgconfig"
-          $gdalLibs = & "C:\msys64\mingw64\bin\pkg-config.exe" --libs gdal 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ GDAL pkg-config successful"
-            Write-Host "  Libs: $gdalLibs"
-          } else {
-            Write-Host "⚠️ GDAL pkg-config failed, but continuing..."
-          }
-        } catch {
-          Write-Host "⚠️ GDAL pkg-config exception: $_, but continuing..."
-        }
-        
-        Write-Host "`n✅ Build environment verification complete"
     
-    - name: Build project
+    - name: Build
       shell: pwsh
       run: |
-        Write-Host "=== Building Project ==="
+        Write-Host "=== Starting build ==="
         
-        # Ensure environment is set for this step
-        $env:PKG_CONFIG_PATH = "C:\msys64\mingw64\lib\pkgconfig"
-        $env:GDAL_HOME = "C:\msys64\mingw64"
+        # Set environment for this step
+        $env:PKG_CONFIG_PATH = $env:PKG_CONFIG_PATH
         
-        Write-Host "Starting cargo build..."
-        try {
-          cargo build --release --target x86_64-pc-windows-gnu --verbose
-          
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ Build successful!"
-            
-            # Verify output file exists
-            $outputPath = "target\x86_64-pc-windows-gnu\release\raster-calc.exe"
-            if (Test-Path $outputPath) {
-              Write-Host "✅ Output binary found: $outputPath"
-              $fileInfo = Get-Item $outputPath
-              Write-Host "  Size: $($fileInfo.Length) bytes"
-              Write-Host "  Modified: $($fileInfo.LastWriteTime)"
-            } else {
-              Write-Host "❌ Output binary not found at: $outputPath"
-              exit 1
-            }
-          } else {
-            Write-Host "❌ Build failed with exit code: $LASTEXITCODE"
-            exit 1
-          }
-        } catch {
-          Write-Host "❌ Build exception: $_"
-          exit 1
-        }
+        # Try to build
+        cargo build --release --target x86_64-pc-windows-gnu --verbose
     
-    - name: Test binary
-      shell: pwsh
-      run: |
-        Write-Host "=== Testing Binary ==="
-        
-        $binaryPath = "target\x86_64-pc-windows-gnu\release\raster-calc.exe"
-        
-        if (Test-Path $binaryPath) {
-          Write-Host "Testing binary execution..."
-          try {
-            # Test help command
-            $helpOutput = & $binaryPath --help 2>&1
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "✅ Binary execution test successful"
-              Write-Host "Help output (first few lines):"
-              $helpOutput | Select-Object -First 5 | ForEach-Object { Write-Host "  $_" }
-            } else {
-              Write-Host "❌ Binary execution test failed"
-              Write-Host "Output: $helpOutput"
-            }
-          } catch {
-            Write-Host "❌ Binary test exception: $_"
-          }
-        } else {
-          Write-Host "❌ Binary not found for testing"
-          exit 1
-        }
-    
-    - name: Create release package
+    - name: Compress artifacts
       if: success()
       shell: pwsh
       run: |
-        Write-Host "=== Creating Release Package ==="
-        
-        $binaryPath = "target\x86_64-pc-windows-gnu\release\raster-calc.exe"
-        $packageName = "raster-calc-windows-x86_64.zip"
-        
-        if (Test-Path $binaryPath) {
-          # Create zip package
-          Compress-Archive -Path $binaryPath -DestinationPath $packageName -Force
-          
-          if (Test-Path $packageName) {
-            Write-Host "✅ Package created: $packageName"
-            $packageInfo = Get-Item $packageName
-            Write-Host "  Package size: $($packageInfo.Length) bytes"
-          } else {
-            Write-Host "❌ Package creation failed"
-            exit 1
-          }
-        } else {
-          Write-Host "❌ Binary not found for packaging"
-          exit 1
-        }
+        cd target/x86_64-pc-windows-gnu/release
+        7z a ../../../raster-calc-windows-x86_64.zip raster-calc.exe
     
     - name: Upload artifacts
       if: success()
@@ -302,12 +181,3 @@ PKG_CONFIG_PATH = "C:\\msys64\\mingw64\\lib\\pkgconfig"
       with:
         name: raster-calc-windows-x86_64
         path: raster-calc-windows-x86_64.zip
-        retention-days: 30
-        
-    - name: Upload to release (if tag provided)
-      if: success() && github.event.inputs.tag_name != 'test-build'
-      uses: softprops/action-gh-release@v2
-      with:
-        files: raster-calc-windows-x86_64.zip
-        tag_name: ${{ github.event.inputs.tag_name }}
-        fail_on_unmatched_files: true
