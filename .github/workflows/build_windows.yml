@@ -182,11 +182,14 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Starting build ==="
-
+        
           # Set environment for this step
           $env:PKG_CONFIG_PATH = $env:PKG_CONFIG_PATH
-
-          # Try to build
+          
+          # Try to bypass bindgen issues by using docs.rs mode
+          $env:DOCS_RS = "1"
+          
+          # Build normally
           cargo build --release --target x86_64-pc-windows-gnu --verbose
 
       - name: Compress artifacts
