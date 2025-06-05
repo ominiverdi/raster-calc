@@ -1,0 +1,145 @@
+name: Build Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to attach binaries to (e.g., v0.1.0)'
+        required: false
+        default: 'test-build'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install MSYS2 and GDAL
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gdal
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-pkg-config
+    
+    - name: Setup Rust with GNU toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable-x86_64-pc-windows-gnu
+    
+    - name: Find GDAL installation
+      shell: pwsh
+      run: |
+        # Find where MSYS2 actually installed things
+        Write-Host "=== Searching for GDAL files ==="
+        if (Test-Path "C:\msys64") {
+          Get-ChildItem -Path "C:\msys64" -Recurse -Name "*gdal*" -ErrorAction SilentlyContinue | Select-Object -First 10
+          Write-Host "=== GDAL config locations ==="
+          Get-ChildItem -Path "C:\msys64" -Recurse -Name "*gdal-config*" -ErrorAction SilentlyContinue
+          Write-Host "=== Checking mingw64 structure ==="
+          if (Test-Path "C:\msys64\mingw64") {
+            Get-ChildItem "C:\msys64\mingw64" | Select-Object Name
+            if (Test-Path "C:\msys64\mingw64\bin") {
+              Write-Host "=== Files in mingw64/bin ==="
+              Get-ChildItem "C:\msys64\mingw64\bin" | Where-Object Name -like "*gdal*" | Select-Object Name
+            }
+            if (Test-Path "C:\msys64\mingw64\lib") {
+              Write-Host "=== GDAL libraries in mingw64/lib ==="
+              Get-ChildItem "C:\msys64\mingw64\lib" | Where-Object Name -like "*gdal*" | Select-Object Name
+            }
+          }
+        }
+    
+    - name: Configure build environment
+      shell: pwsh
+      run: |
+        # First, let's see what's actually installed
+        $gdalConfig = Get-ChildItem -Path "C:\msys64" -Recurse -Name "gdal-config*" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($gdalConfig) {
+          $gdalConfigPath = "C:\msys64\$gdalConfig"
+          Write-Host "Found gdal-config at: $gdalConfigPath"
+          # Try to get GDAL info from MSYS2 shell
+          C:\msys64\usr\bin\bash.exe -lc "which gdal-config"
+          C:\msys64\usr\bin\bash.exe -lc "gdal-config --version"
+          C:\msys64\usr\bin\bash.exe -lc "gdal-config --libs"
+        }
+        
+        # Set up environment variables (try both possible locations)
+        if (Test-Path "C:\msys64\mingw64") {
+          echo "GDAL_HOME=C:\msys64\mingw64" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_LIB_DIR=C:\msys64\mingw64\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_INCLUDE_DIR=C:\msys64\mingw64\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG_PATH=C:\msys64\mingw64\lib\pkgconfig" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        }
+        
+        # Ensure we're using the GNU toolchain
+        echo "RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        
+        # Add MSYS2 to PATH
+        echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    
+    - name: Create Cargo config for GNU toolchain
+      shell: pwsh
+      run: |
+        New-Item -Path "$env:USERPROFILE\.cargo" -ItemType Directory -Force
+        @"
+        [target.x86_64-pc-windows-gnu]
+        linker = "C:\\msys64\\mingw64\\bin\\gcc.exe"
+        ar = "C:\\msys64\\mingw64\\bin\\ar.exe"
+        
+        [build]
+        target = "x86_64-pc-windows-gnu"
+        "@ | Out-File -FilePath "$env:USERPROFILE\.cargo\config.toml" -Encoding UTF8
+    
+    - name: Verify installations
+      shell: pwsh
+      run: |
+        Write-Host "=== Rust toolchain ==="
+        rustup default stable-x86_64-pc-windows-gnu
+        rustc --version --verbose
+        
+        Write-Host "=== Environment variables ==="
+        Write-Host "GDAL_HOME: $env:GDAL_HOME"
+        Write-Host "PKG_CONFIG_PATH: $env:PKG_CONFIG_PATH"
+        Write-Host "PATH includes:"
+        $env:PATH -split ';' | Where-Object { $_ -like "*msys*" } | ForEach-Object { Write-Host "  $_" }
+        
+        Write-Host "=== Test GDAL via MSYS2 bash ==="
+        C:\msys64\usr\bin\bash.exe -lc "pkg-config --version"
+        C:\msys64\usr\bin\bash.exe -lc "pkg-config --exists gdal && echo 'GDAL pkg-config found' || echo 'GDAL pkg-config not found'"
+        if (C:\msys64\usr\bin\bash.exe -lc "pkg-config --exists gdal") {
+          C:\msys64\usr\bin\bash.exe -lc "pkg-config --libs gdal"
+          C:\msys64\usr\bin\bash.exe -lc "pkg-config --cflags gdal"
+        }
+    
+    - name: Build
+      shell: pwsh
+      run: |
+        Write-Host "=== Starting build ==="
+        
+        # Set environment for this step
+        $env:PKG_CONFIG_PATH = $env:PKG_CONFIG_PATH
+        
+        # Try to build
+        cargo build --release --target x86_64-pc-windows-gnu --verbose
+    
+    - name: Compress artifacts
+      if: success()
+      shell: pwsh
+      run: |
+        cd target/x86_64-pc-windows-gnu/release
+        7z a ../../../raster-calc-windows-x86_64.zip raster-calc.exe
+    
+    - name: Upload artifacts
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: raster-calc-windows-x86_64
+        path: raster-calc-windows-x86_64.zip
