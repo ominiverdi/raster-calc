@@ -27,6 +27,31 @@ jobs:
           mingw-w64-x86_64-gdal
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-pkg-config
+          
+    - name: Verify GDAL installation
+      shell: pwsh
+      run: |
+        Write-Host "=== Verify pacman installation ==="
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pacman -Q | grep gdal"
+        
+        Write-Host "=== Check if GDAL files exist ==="
+        if (Test-Path "C:\msys64\mingw64\bin\gdal-config") {
+          Write-Host "✅ gdal-config found!"
+        } else {
+          Write-Host "❌ gdal-config NOT found"
+        }
+        
+        if (Test-Path "C:\msys64\mingw64\bin\gdalinfo.exe") {
+          Write-Host "✅ gdalinfo.exe found!"
+        } else {
+          Write-Host "❌ gdalinfo.exe NOT found"
+        }
+        
+        Write-Host "=== Force reinstall GDAL if missing ==="
+        if (-not (Test-Path "C:\msys64\mingw64\bin\gdal-config")) {
+          Write-Host "Reinstalling GDAL..."
+          C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pacman -S --noconfirm --overwrite '*' mingw-w64-x86_64-gdal"
+        }
     
     - name: Setup Rust with GNU toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -36,25 +61,26 @@ jobs:
     - name: Find GDAL installation
       shell: pwsh
       run: |
-        # Find where MSYS2 actually installed things
-        Write-Host "=== Searching for GDAL files ==="
-        if (Test-Path "C:\msys64") {
-          Get-ChildItem -Path "C:\msys64" -Recurse -Name "*gdal*" -ErrorAction SilentlyContinue | Select-Object -First 10
-          Write-Host "=== GDAL config locations ==="
-          Get-ChildItem -Path "C:\msys64" -Recurse -Name "*gdal-config*" -ErrorAction SilentlyContinue
-          Write-Host "=== Checking mingw64 structure ==="
-          if (Test-Path "C:\msys64\mingw64") {
-            Get-ChildItem "C:\msys64\mingw64" | Select-Object Name
-            if (Test-Path "C:\msys64\mingw64\bin") {
-              Write-Host "=== Files in mingw64/bin ==="
-              Get-ChildItem "C:\msys64\mingw64\bin" | Where-Object Name -like "*gdal*" | Select-Object Name
-            }
-            if (Test-Path "C:\msys64\mingw64\lib") {
-              Write-Host "=== GDAL libraries in mingw64/lib ==="
-              Get-ChildItem "C:\msys64\mingw64\lib" | Where-Object Name -like "*gdal*" | Select-Object Name
-            }
-          }
+        Write-Host "=== Detailed GDAL search ==="
+        if (Test-Path "C:\msys64\mingw64\bin") {
+          Write-Host "=== ALL files in mingw64/bin ==="
+          Get-ChildItem "C:\msys64\mingw64\bin" | Select-Object Name | Sort-Object Name
+          Write-Host "=== GDAL files in mingw64/bin ==="
+          Get-ChildItem "C:\msys64\mingw64\bin" | Where-Object Name -like "*gdal*" | Select-Object Name
         }
+        
+        if (Test-Path "C:\msys64\mingw64\lib") {
+          Write-Host "=== GDAL libraries in mingw64/lib ==="
+          Get-ChildItem "C:\msys64\mingw64\lib" | Where-Object Name -like "*gdal*" | Select-Object Name
+          Write-Host "=== pkg-config files ==="
+          Get-ChildItem "C:\msys64\mingw64\lib\pkgconfig" -ErrorAction SilentlyContinue | Where-Object Name -like "*gdal*" | Select-Object Name
+        }
+        
+        Write-Host "=== Search for gdal-config anywhere ==="
+        Get-ChildItem -Path "C:\msys64" -Recurse -Name "*gdal-config*" -ErrorAction SilentlyContinue
+        
+        Write-Host "=== Check pacman packages ==="
+        C:\msys64\usr\bin\bash.exe -lc "pacman -Q | grep gdal"
     
     - name: Configure build environment
       shell: pwsh
