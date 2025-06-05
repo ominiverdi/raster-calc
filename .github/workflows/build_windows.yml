@@ -199,17 +199,18 @@ jobs:
       - name: Fix GDAL DLL naming for gdal-sys
         shell: pwsh
         run: |
-          Write-Host "=== Fixing GDAL DLL naming ==="
-          # gdal-sys expects gdal{version}.dll but MSYS2 provides libgdal-36.dll
-          # Copy with the expected name
-          if (Test-Path "C:\msys64\mingw64\bin\libgdal-36.dll") {
-            Copy-Item "C:\msys64\mingw64\bin\libgdal-36.dll" "C:\msys64\mingw64\bin\gdal310.dll"
-            Write-Host "✅ Created gdal310.dll for gdal-sys"
+          Write-Host "=== Fixing GDAL library naming ==="
+          # gdal-sys expects gdal_i.lib but MSYS2 provides libgdal.dll.a
+          # Create the file that gdal-sys is looking for
+          if (Test-Path "C:\msys64\mingw64\lib\libgdal.dll.a") {
+            Copy-Item "C:\msys64\mingw64\lib\libgdal.dll.a" "C:\msys64\mingw64\lib\gdal_i.lib"
+            Write-Host "✅ Created gdal_i.lib for gdal-sys"
           } else {
-            Write-Host "❌ libgdal-36.dll not found!"
+            Write-Host "❌ libgdal.dll.a not found!"
+            Get-ChildItem "C:\msys64\mingw64\lib" | Where-Object Name -like "*gdal*" | Select-Object Name
             exit 1
           }
-          
+
       - name: Build
         shell: pwsh
         run: |
