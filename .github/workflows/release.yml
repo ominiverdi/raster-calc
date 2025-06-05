@@ -73,7 +73,6 @@ jobs:
           mingw-w64-x86_64-gdal
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-pkg-config
-          mingw-w64-x86_64-clang
     
     - name: Setup Rust with GNU toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -81,20 +80,20 @@ jobs:
         toolchain: stable-x86_64-pc-windows-gnu
     
     - name: Configure build environment
-      shell: msys2 {0}
+      shell: pwsh
       run: |
-        # Set up environment variables for GDAL
-        echo "GDAL_HOME=/mingw64" >> $GITHUB_ENV
-        echo "GDAL_LIB_DIR=/mingw64/lib" >> $GITHUB_ENV
-        echo "GDAL_INCLUDE_DIR=/mingw64/include" >> $GITHUB_ENV
-        echo "PKG_CONFIG_PATH=/mingw64/lib/pkgconfig" >> $GITHUB_ENV
+        # Set up environment variables for GDAL (Windows paths for GitHub ENV)
+        echo "GDAL_HOME=C:\msys64\mingw64" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        echo "GDAL_LIB_DIR=C:\msys64\mingw64\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        echo "GDAL_INCLUDE_DIR=C:\msys64\mingw64\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        echo "PKG_CONFIG_PATH=C:\msys64\mingw64\lib\pkgconfig" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         
         # Ensure we're using the GNU toolchain
-        echo "RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu" >> $GITHUB_ENV
+        echo "RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         
-        # Add MSYS2 to PATH for subsequent steps
-        echo "/mingw64/bin" >> $GITHUB_PATH
-        echo "/usr/bin" >> $GITHUB_PATH
+        # Add MSYS2 to PATH for subsequent steps (Windows format)
+        echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     
     - name: Create Cargo config for GNU toolchain
       shell: pwsh
@@ -110,30 +109,37 @@ jobs:
         "@ | Out-File -FilePath "$env:USERPROFILE\.cargo\config.toml" -Encoding UTF8
     
     - name: Verify GDAL installation
-      shell: msys2 {0}
+      shell: pwsh
       run: |
-        which gdal-config
-        gdal-config --version
-        gdal-config --libs
-        pkg-config --libs gdal
-        ls -la /mingw64/lib/libgdal*
+        # Test GDAL installation
+        C:\msys64\mingw64\bin\gdal-config.exe --version
+        C:\msys64\mingw64\bin\gdal-config.exe --libs
+        
+        # Test pkg-config
+        $env:PKG_CONFIG_PATH = "C:\msys64\mingw64\lib\pkgconfig"
+        C:\msys64\mingw64\bin\pkg-config.exe --libs gdal
+        
+        # Check if libraries exist
+        if (Test-Path "C:\msys64\mingw64\lib\libgdal*") {
+          Get-ChildItem "C:\msys64\mingw64\lib\libgdal*" | Select-Object Name
+        } else {
+          Write-Host "GDAL libraries not found!"
+          exit 1
+        }
     
     - name: Build
-      shell: msys2 {0}
+      shell: pwsh
       run: |
-        export GDAL_HOME=/mingw64
-        export GDAL_LIB_DIR=/mingw64/lib  
-        export GDAL_INCLUDE_DIR=/mingw64/include
-        export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig
-        
-        # Ensure we're using the GNU toolchain
-        export RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu
+        # Verify Rust toolchain
         rustup default stable-x86_64-pc-windows-gnu
-        
-        # Verify toolchain
         rustc --version --verbose
         
-        # Build the project
+        # Verify GDAL is accessible and environment variables
+        Write-Host "GDAL_HOME: $env:GDAL_HOME"
+        Write-Host "PKG_CONFIG_PATH: $env:PKG_CONFIG_PATH"
+        C:\msys64\mingw64\bin\gdal-config.exe --version
+        
+        # Build the project with GNU target
         cargo build --release --target x86_64-pc-windows-gnu --verbose
     
     - name: Compress artifacts
