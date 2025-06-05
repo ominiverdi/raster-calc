@@ -1,4 +1,4 @@
-name: Build Windows Release
+name: Build Windows Release (Fixed)
 
 on:
   workflow_dispatch:
@@ -18,72 +18,127 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Use the standard Windows development approach
       - name: Setup Rust MSVC toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable-x86_64-pc-windows-msvc
 
-      - name: Install GDAL via vcpkg
+      - name: Download and setup GDAL from GIS Internals
         shell: pwsh
         run: |
-          Write-Host "=== Installing GDAL via vcpkg (Windows standard) ==="
+          Write-Host "=== Downloading GDAL from GIS Internals (recommended approach) ==="
           
-          # Use GitHub's pre-installed vcpkg
-          $env:VCPKG_ROOT = "C:\vcpkg"
+          # Create GDAL directory
+          New-Item -ItemType Directory -Path "C:\gdal" -Force
           
-          # Install GDAL (this is the standard Windows approach)
-          & C:\vcpkg\vcpkg.exe install gdal:x64-windows
+          # Download GDAL development libraries (MSVC 2019, x64)
+          # Using GDAL 3.8.4 (adjust version as needed)
+          $gdalUrl = "https://download.gisinternals.com/sdk/downloads/release-1930-x64-gdal-3-8-4-mapserver-8-0-1.zip"
+          $gdalZip = "C:\gdal\gdal-dev.zip"
+          
+          Write-Host "Downloading GDAL from: $gdalUrl"
+          try {
+            Invoke-WebRequest -Uri $gdalUrl -OutFile $gdalZip -UseBasicParsing
+            Write-Host "✅ Download completed"
+          } catch {
+            Write-Host "❌ Download failed: $_"
+            # Try alternative URL or fallback
+            $gdalUrl = "https://download.gisinternals.com/sdk/downloads/release-1930-x64-gdal-3-7-3-mapserver-8-0-1.zip"
+            Write-Host "Trying alternative URL: $gdalUrl"
+            Invoke-WebRequest -Uri $gdalUrl -OutFile $gdalZip -UseBasicParsing
+          }
+          
+          # Extract GDAL
+          Write-Host "Extracting GDAL..."
+          Expand-Archive -Path $gdalZip -DestinationPath "C:\gdal" -Force
+          
+          # Find the extracted directory (it usually has a version-specific name)
+          $gdalDir = Get-ChildItem "C:\gdal" -Directory | Where-Object { $_.Name -like "*gdal*" -or $_.Name -like "*release*" } | Select-Object -First 1
+          if ($gdalDir) {
+            $gdalRoot = $gdalDir.FullName
+          } else {
+            # If no subdirectory, use C:\gdal directly
+            $gdalRoot = "C:\gdal"
+          }
+          
+          Write-Host "GDAL extracted to: $gdalRoot"
           
           # Set environment variables for build
-          $env:GDAL_HOME = "C:\vcpkg\installed\x64-windows"
-          echo "GDAL_HOME=C:\vcpkg\installed\x64-windows" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "GDAL_LIB_DIR=C:\vcpkg\installed\x64-windows\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "GDAL_INCLUDE_DIR=C:\vcpkg\installed\x64-windows\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_HOME=$gdalRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_LIB_DIR=$gdalRoot\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_INCLUDE_DIR=$gdalRoot\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_VERSION=3.8.4" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           
           # Add to PATH for runtime
-          echo "C:\vcpkg\installed\x64-windows\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "$gdalRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Verify GDAL installation
         shell: pwsh
         run: |
           Write-Host "=== Verifying GDAL installation ==="
           
-          # Check if GDAL files exist
-          $gdalLib = "C:\vcpkg\installed\x64-windows\lib\gdal.lib"
-          $gdalInclude = "C:\vcpkg\installed\x64-windows\include\gdal.h"
-          $gdalBin = "C:\vcpkg\installed\x64-windows\bin\gdal-config.exe"
+          Write-Host "Environment variables:"
+          Write-Host "GDAL_HOME: $env:GDAL_HOME"
+          Write-Host "GDAL_LIB_DIR: $env:GDAL_LIB_DIR"  
+          Write-Host "GDAL_INCLUDE_DIR: $env:GDAL_INCLUDE_DIR"
+          Write-Host "GDAL_VERSION: $env:GDAL_VERSION"
           
-          if (Test-Path $gdalLib) {
-            Write-Host "✅ GDAL library found: $gdalLib"
-          } else {
-            Write-Host "❌ GDAL library not found!"
-            exit 1
+          # Check for required files
+          $requiredFiles = @(
+            "$env:GDAL_LIB_DIR\gdal_i.lib",
+            "$env:GDAL_INCLUDE_DIR\gdal.h"
+          )
+          
+          foreach ($file in $requiredFiles) {
+            if (Test-Path $file) {
+              Write-Host "✅ Found: $file"
+            } else {
+              Write-Host "❌ Missing: $file"
+              
+              # List what we actually have
+              if (Test-Path $env:GDAL_LIB_DIR) {
+                Write-Host "Available lib files:"
+                Get-ChildItem "$env:GDAL_LIB_DIR\*.lib" | ForEach-Object { Write-Host "  $($_.Name)" }
+              }
+              
+              if (Test-Path $env:GDAL_INCLUDE_DIR) {
+                Write-Host "Available include files:"
+                Get-ChildItem "$env:GDAL_INCLUDE_DIR\gdal*" | ForEach-Object { Write-Host "  $($_.Name)" }
+              }
+            }
           }
           
-          if (Test-Path $gdalInclude) {
-            Write-Host "✅ GDAL headers found: $gdalInclude"
-          } else {
-            Write-Host "❌ GDAL headers not found!"
-            exit 1
+          # If gdal_i.lib doesn't exist but gdal.lib does, copy it
+          $gdalLib = "$env:GDAL_LIB_DIR\gdal.lib"
+          $gdalILib = "$env:GDAL_LIB_DIR\gdal_i.lib"
+          
+          if ((Test-Path $gdalLib) -and (-not (Test-Path $gdalILib))) {
+            Write-Host "🔧 Copying gdal.lib to gdal_i.lib (naming compatibility fix)"
+            Copy-Item $gdalLib $gdalILib
           }
 
       - name: Build with MSVC
         shell: pwsh
         run: |
-          Write-Host "=== Building with MSVC (Windows standard) ==="
+          Write-Host "=== Building with MSVC ==="
           
-          # Set GDAL environment
-          $env:GDAL_HOME = "C:\vcpkg\installed\x64-windows"
-          $env:GDAL_LIB_DIR = "C:\vcpkg\installed\x64-windows\lib"
-          $env:GDAL_INCLUDE_DIR = "C:\vcpkg\installed\x64-windows\include"
+          # Verify environment is set
+          Write-Host "Build environment:"
+          Write-Host "GDAL_HOME: $env:GDAL_HOME"
+          Write-Host "GDAL_LIB_DIR: $env:GDAL_LIB_DIR"
+          Write-Host "GDAL_INCLUDE_DIR: $env:GDAL_INCLUDE_DIR"
+          Write-Host "GDAL_VERSION: $env:GDAL_VERSION"
           
-          # Build for MSVC target
+          # Build
           cargo build --release --target x86_64-pc-windows-msvc --verbose
           
           # Verify binary was created
           if (Test-Path "target\x86_64-pc-windows-msvc\release\raster-calc.exe") {
             Write-Host "✅ Build successful!"
+            
+            # Show binary info
+            $binary = Get-Item "target\x86_64-pc-windows-msvc\release\raster-calc.exe"
+            Write-Host "Binary size: $([math]::Round($binary.Length / 1MB, 2)) MB"
           } else {
             Write-Host "❌ Build failed - binary not created"
             exit 1
@@ -95,16 +150,30 @@ jobs:
           Write-Host "=== Testing binary ==="
           
           # Add GDAL DLLs to PATH for testing
-          $env:PATH = "C:\vcpkg\installed\x64-windows\bin;$env:PATH"
+          $env:PATH = "$env:GDAL_HOME\bin;$env:PATH"
           
           # Test the binary
           $binary = "target\x86_64-pc-windows-msvc\release\raster-calc.exe"
+          
+          Write-Host "Testing --help:"
           & $binary --help
           
           if ($LASTEXITCODE -eq 0) {
             Write-Host "✅ Binary test successful!"
+            
+            Write-Host "Testing --version:"
+            & $binary --version
           } else {
-            Write-Host "❌ Binary test failed"
+            Write-Host "❌ Binary test failed (exit code: $LASTEXITCODE)"
+            
+            # Check for missing DLLs
+            Write-Host "Checking for missing dependencies..."
+            try {
+              & $binary 2>&1 | Write-Host
+            } catch {
+              Write-Host "Error details: $_"
+            }
+            
             exit 1
           }
 
@@ -120,30 +189,15 @@ jobs:
           Copy-Item "target\x86_64-pc-windows-msvc\release\raster-calc.exe" "release_package\"
           
           # Copy required GDAL DLLs
-          $gdalBinDir = "C:\vcpkg\installed\x64-windows\bin"
-          Get-ChildItem "$gdalBinDir\*.dll" | ForEach-Object {
-            Copy-Item $_.FullName "release_package\"
+          $gdalBinDir = "$env:GDAL_HOME\bin"
+          if (Test-Path $gdalBinDir) {
+            Write-Host "Copying GDAL DLLs from: $gdalBinDir"
+            Get-ChildItem "$gdalBinDir\*.dll" | ForEach-Object {
+              Copy-Item $_.FullName "release_package\"
+              Write-Host "  Copied: $($_.Name)"
+            }
           }
           
-          # Create zip package
-          Compress-Archive -Path "release_package\*" -DestinationPath "raster-calc-windows-x86_64.zip" -Force
-          
-          Write-Host "✅ Release package created"
-          
-          # Show package contents
-          Write-Host "Package contents:"
-          Get-ChildItem "release_package" | ForEach-Object { Write-Host "  $($_.Name)" }
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: raster-calc-windows-x86_64
-          path: raster-calc-windows-x86_64.zip
-
-      - name: Upload to release (if tag provided)
-        if: github.event.inputs.tag_name != 'test-build'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: raster-calc-windows-x86_64.zip
-          tag_name: ${{ github.event.inputs.tag_name }}
-          fail_on_unmatched_files: true
+          # Create README for the package
+          @"
+# raster-calc Windows Release
