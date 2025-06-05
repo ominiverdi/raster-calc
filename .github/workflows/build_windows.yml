@@ -23,53 +23,85 @@ jobs:
         with:
           toolchain: stable-x86_64-pc-windows-msvc
 
-      - name: Download and setup GDAL from GIS Internals
+      - name: Download and setup GDAL from OSGeo4W (more reliable)
         shell: pwsh
         run: |
-          Write-Host "=== Downloading GDAL from GIS Internals (recommended approach) ==="
+          Write-Host "=== Setting up GDAL via OSGeo4W (more reliable) ==="
           
-          # Create GDAL directory
+          # Create working directory
           New-Item -ItemType Directory -Path "C:\gdal" -Force
           
-          # Download GDAL development libraries (MSVC 2019, x64)
-          # Using GDAL 3.8.4 (adjust version as needed)
-          $gdalUrl = "https://download.gisinternals.com/sdk/downloads/release-1930-x64-gdal-3-8-4-mapserver-8-0-1.zip"
-          $gdalZip = "C:\gdal\gdal-dev.zip"
+          # Download OSGeo4W installer
+          $installerUrl = "https://download.osgeo.org/osgeo4w/v2/osgeo4w-setup.exe"
+          $installerPath = "C:\gdal\osgeo4w-setup.exe"
           
-          Write-Host "Downloading GDAL from: $gdalUrl"
-          try {
-            Invoke-WebRequest -Uri $gdalUrl -OutFile $gdalZip -UseBasicParsing
-            Write-Host "✅ Download completed"
-          } catch {
-            Write-Host "❌ Download failed: $_"
-            # Try alternative URL or fallback
-            $gdalUrl = "https://download.gisinternals.com/sdk/downloads/release-1930-x64-gdal-3-7-3-mapserver-8-0-1.zip"
-            Write-Host "Trying alternative URL: $gdalUrl"
-            Invoke-WebRequest -Uri $gdalUrl -OutFile $gdalZip -UseBasicParsing
+          Write-Host "Downloading OSGeo4W installer..."
+          Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
+          
+          # Install GDAL via OSGeo4W (silent install)
+          Write-Host "Installing GDAL via OSGeo4W..."
+          Start-Process -FilePath $installerPath -ArgumentList @(
+            "--quiet-mode",
+            "--no-desktop",
+            "--no-startmenu", 
+            "--root", "C:\OSGeo4W",
+            "--site", "https://download.osgeo.org/osgeo4w/v2/",
+            "--packages", "gdal,gdal-devel"
+          ) -Wait -NoNewWindow
+          
+          # Check if installation succeeded
+          $gdalRoot = "C:\OSGeo4W"
+          $gdalLib = "$gdalRoot\lib\gdal_i.lib"
+          $gdalInclude = "$gdalRoot\include\gdal.h"
+          
+          if (-not (Test-Path $gdalLib)) {
+            Write-Host "❌ OSGeo4W approach failed, trying direct download..."
+            
+            # Fallback: Download pre-built binaries directly
+            $directUrl = "https://github.com/cgohlke/geospatial-wheels/releases/download/v2023.8.27/gdal-3.7.2-cp311-cp311-win_amd64.whl"
+            Write-Host "Using fallback approach with conda-forge style setup..."
+            
+            # Use conda to install GDAL (GitHub Actions has miniconda pre-installed)
+            & conda install -c conda-forge gdal=3.7 --yes --quiet
+            
+            # Find conda installation
+            $condaRoot = & conda info --base
+            $gdalRoot = "$condaRoot\Library"
+            
+            Write-Host "Using conda GDAL at: $gdalRoot"
           }
           
-          # Extract GDAL
-          Write-Host "Extracting GDAL..."
-          Expand-Archive -Path $gdalZip -DestinationPath "C:\gdal" -Force
+          # Verify the installation and handle library naming
+          Write-Host "GDAL installation directory: $gdalRoot"
           
-          # Find the extracted directory (it usually has a version-specific name)
-          $gdalDir = Get-ChildItem "C:\gdal" -Directory | Where-Object { $_.Name -like "*gdal*" -or $_.Name -like "*release*" } | Select-Object -First 1
-          if ($gdalDir) {
-            $gdalRoot = $gdalDir.FullName
-          } else {
-            # If no subdirectory, use C:\gdal directly
-            $gdalRoot = "C:\gdal"
+          # Check what we have
+          Write-Host "Checking installation structure..."
+          if (Test-Path "$gdalRoot\lib") {
+            Write-Host "Found lib directory:"
+            Get-ChildItem "$gdalRoot\lib\*gdal*" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
           }
           
-          Write-Host "GDAL extracted to: $gdalRoot"
+          if (Test-Path "$gdalRoot\include") {
+            Write-Host "Found include directory:"
+            Get-ChildItem "$gdalRoot\include\gdal*" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+          }
           
-          # Set environment variables for build
+          # Handle library naming (gdal.lib vs gdal_i.lib)
+          $gdalLib = "$gdalRoot\lib\gdal.lib"
+          $gdalILib = "$gdalRoot\lib\gdal_i.lib"
+          
+          if ((Test-Path $gdalLib) -and (-not (Test-Path $gdalILib))) {
+            Write-Host "🔧 Creating gdal_i.lib from gdal.lib (naming fix)"
+            Copy-Item $gdalLib $gdalILib
+          }
+          
+          # Set environment variables
           echo "GDAL_HOME=$gdalRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           echo "GDAL_LIB_DIR=$gdalRoot\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           echo "GDAL_INCLUDE_DIR=$gdalRoot\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "GDAL_VERSION=3.8.4" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "GDAL_VERSION=3.7.2" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           
-          # Add to PATH for runtime
+          # Add to PATH
           echo "$gdalRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Verify GDAL installation
@@ -89,32 +121,81 @@ jobs:
             "$env:GDAL_INCLUDE_DIR\gdal.h"
           )
           
+          $allFilesFound = $true
           foreach ($file in $requiredFiles) {
             if (Test-Path $file) {
               Write-Host "✅ Found: $file"
             } else {
               Write-Host "❌ Missing: $file"
+              $allFilesFound = $false
+            }
+          }
+          
+          if (-not $allFilesFound) {
+            Write-Host "🔍 Debugging missing files..."
+            
+            # Show what we actually have
+            Write-Host "GDAL_HOME contents:"
+            if (Test-Path $env:GDAL_HOME) {
+              Get-ChildItem $env:GDAL_HOME | ForEach-Object { Write-Host "  $($_.Name)" }
+            }
+            
+            Write-Host "Available lib files:"
+            if (Test-Path $env:GDAL_LIB_DIR) {
+              Get-ChildItem "$env:GDAL_LIB_DIR\*" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+            } else {
+              Write-Host "  LIB_DIR does not exist!"
+            }
+            
+            Write-Host "Available include files:"
+            if (Test-Path $env:GDAL_INCLUDE_DIR) {
+              Get-ChildItem "$env:GDAL_INCLUDE_DIR\*" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+            } else {
+              Write-Host "  INCLUDE_DIR does not exist!"
+            }
+            
+            # Final attempt: create missing library link if possible
+            $gdalLib = "$env:GDAL_LIB_DIR\gdal.lib"
+            $gdalILib = "$env:GDAL_LIB_DIR\gdal_i.lib"
+            
+            if ((Test-Path $gdalLib) -and (-not (Test-Path $gdalILib))) {
+              Write-Host "🔧 Final attempt: Copying gdal.lib to gdal_i.lib"
+              Copy-Item $gdalLib $gdalILib -Force
+            }
+            
+            # Check again
+            if (-not (Test-Path $gdalILib)) {
+              Write-Host "❌ Could not resolve gdal_i.lib - trying alternative approach"
               
-              # List what we actually have
-              if (Test-Path $env:GDAL_LIB_DIR) {
-                Write-Host "Available lib files:"
-                Get-ChildItem "$env:GDAL_LIB_DIR\*.lib" | ForEach-Object { Write-Host "  $($_.Name)" }
-              }
-              
-              if (Test-Path $env:GDAL_INCLUDE_DIR) {
-                Write-Host "Available include files:"
-                Get-ChildItem "$env:GDAL_INCLUDE_DIR\gdal*" | ForEach-Object { Write-Host "  $($_.Name)" }
+              # Last resort: check if there are any .lib files we can use
+              $libFiles = Get-ChildItem "$env:GDAL_LIB_DIR\*.lib" -ErrorAction SilentlyContinue
+              if ($libFiles) {
+                Write-Host "Found these .lib files:"
+                $libFiles | ForEach-Object { Write-Host "  $($_.Name)" }
+                
+                # Try to find a GDAL library to copy
+                $gdalLibAlt = $libFiles | Where-Object { $_.Name -like "*gdal*" } | Select-Object -First 1
+                if ($gdalLibAlt) {
+                  Write-Host "🔧 Using $($gdalLibAlt.Name) as gdal_i.lib"
+                  Copy-Item $gdalLibAlt.FullName $gdalILib -Force
+                }
               }
             }
           }
           
-          # If gdal_i.lib doesn't exist but gdal.lib does, copy it
-          $gdalLib = "$env:GDAL_LIB_DIR\gdal.lib"
-          $gdalILib = "$env:GDAL_LIB_DIR\gdal_i.lib"
+          Write-Host "Final verification:"
+          if (Test-Path "$env:GDAL_LIB_DIR\gdal_i.lib") {
+            Write-Host "✅ gdal_i.lib is ready"
+          } else {
+            Write-Host "❌ gdal_i.lib still missing - build will likely fail"
+            exit 1
+          }
           
-          if ((Test-Path $gdalLib) -and (-not (Test-Path $gdalILib))) {
-            Write-Host "🔧 Copying gdal.lib to gdal_i.lib (naming compatibility fix)"
-            Copy-Item $gdalLib $gdalILib
+          if (Test-Path "$env:GDAL_INCLUDE_DIR\gdal.h") {
+            Write-Host "✅ gdal.h is ready"
+          } else {
+            Write-Host "❌ gdal.h missing - build will likely fail"
+            exit 1
           }
 
       - name: Build with MSVC
@@ -200,4 +281,3 @@ jobs:
           
           # Create README for the package
           @"
-# raster-calc Windows Release
