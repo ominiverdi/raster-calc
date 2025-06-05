@@ -60,15 +60,11 @@ jobs:
       shell: pwsh
       run: |
         # First, let's see what's actually installed
-        $gdalConfig = Get-ChildItem -Path "C:\msys64" -Recurse -Name "gdal-config*" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($gdalConfig) {
-          $gdalConfigPath = "C:\msys64\$gdalConfig"
-          Write-Host "Found gdal-config at: $gdalConfigPath"
-          # Try to get GDAL info from MSYS2 shell
-          C:\msys64\usr\bin\bash.exe -lc "which gdal-config"
-          C:\msys64\usr\bin\bash.exe -lc "gdal-config --version"
-          C:\msys64\usr\bin\bash.exe -lc "gdal-config --libs"
-        }
+        Write-Host "=== Testing GDAL via MINGW64 environment ==="
+        $env:MSYSTEM = "MINGW64"
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && which gdal-config"
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && gdal-config --version"
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && gdal-config --libs"
         
         # Set up environment variables (try both possible locations)
         if (Test-Path "C:\msys64\mingw64") {
@@ -111,12 +107,15 @@ jobs:
         Write-Host "PATH includes:"
         $env:PATH -split ';' | Where-Object { $_ -like "*msys*" } | ForEach-Object { Write-Host "  $_" }
         
-        Write-Host "=== Test GDAL via MSYS2 bash ==="
-        C:\msys64\usr\bin\bash.exe -lc "pkg-config --version"
-        C:\msys64\usr\bin\bash.exe -lc "pkg-config --exists gdal && echo 'GDAL pkg-config found' || echo 'GDAL pkg-config not found'"
-        if (C:\msys64\usr\bin\bash.exe -lc "pkg-config --exists gdal") {
-          C:\msys64\usr\bin\bash.exe -lc "pkg-config --libs gdal"
-          C:\msys64\usr\bin\bash.exe -lc "pkg-config --cflags gdal"
+        Write-Host "=== Test GDAL via MINGW64 bash ==="
+        $env:MSYSTEM = "MINGW64"
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --version"
+        C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --exists gdal && echo 'GDAL pkg-config found' || echo 'GDAL pkg-config not found'"
+        $result = C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --exists gdal" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "=== GDAL pkg-config details ==="
+          C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --libs gdal"
+          C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64 && source /etc/profile && pkg-config --cflags gdal"
         }
     
     - name: Build
