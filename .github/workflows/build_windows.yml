@@ -207,6 +207,9 @@ jobs:
           # Try to bypass bindgen issues by using docs.rs mode
           $env:DOCS_RS = "1"
           
+          # Try static linking instead of dynamic
+          $env:GDAL_STATIC = "1"
+          
           # Ensure linker can find GDAL library and dependencies
           $env:LIBRARY_PATH = "C:\msys64\mingw64\lib"
           $env:LD_LIBRARY_PATH = "C:\msys64\mingw64\lib"
