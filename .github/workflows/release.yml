@@ -28,7 +28,7 @@ jobs:
             asset_name: raster-calc-macos-x86_64.tar.gz
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Install GDAL (Linux)
       if: matrix.os == 'ubuntu-latest'
@@ -53,7 +53,7 @@ jobs:
         tar czvf ../../${{ matrix.asset_name }} ${{ matrix.artifact_name }}
     
     - name: Upload Release Asset
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: ${{ matrix.asset_name }}
         tag_name: ${{ github.event.release.tag_name || github.event.inputs.tag_name }}
@@ -62,7 +62,7 @@ jobs:
     name: Build Windows
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Install MSYS2 and GDAL
       uses: msys2/setup-msys2@v2
@@ -73,82 +73,77 @@ jobs:
           mingw-w64-x86_64-gdal
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-pkg-config
+          mingw-w64-x86_64-clang
     
-    - name: Setup Rust
+    - name: Setup Rust with GNU toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
-        targets: x86_64-pc-windows-gnu
+        toolchain: stable-x86_64-pc-windows-gnu
     
-    - name: Add MSYS2 to PATH
+    - name: Configure build environment
+      shell: msys2 {0}
       run: |
-        echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        # Set up environment variables for GDAL
+        echo "GDAL_HOME=/mingw64" >> $GITHUB_ENV
+        echo "GDAL_LIB_DIR=/mingw64/lib" >> $GITHUB_ENV
+        echo "GDAL_INCLUDE_DIR=/mingw64/include" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=/mingw64/lib/pkgconfig" >> $GITHUB_ENV
+        
+        # Ensure we're using the GNU toolchain
+        echo "RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu" >> $GITHUB_ENV
+        
+        # Add MSYS2 to PATH for subsequent steps
+        echo "/mingw64/bin" >> $GITHUB_PATH
+        echo "/usr/bin" >> $GITHUB_PATH
     
-    - name: Set PKG_CONFIG_PATH
+    - name: Create Cargo config for GNU toolchain
+      shell: pwsh
       run: |
-        echo "PKG_CONFIG_PATH=C:\msys64\mingw64\lib\pkgconfig" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        New-Item -Path "$env:USERPROFILE\.cargo" -ItemType Directory -Force
+        @"
+        [target.x86_64-pc-windows-gnu]
+        linker = "C:\\msys64\\mingw64\\bin\\gcc.exe"
+        ar = "C:\\msys64\\mingw64\\bin\\ar.exe"
+        
+        [build]
+        target = "x86_64-pc-windows-gnu"
+        "@ | Out-File -FilePath "$env:USERPROFILE\.cargo\config.toml" -Encoding UTF8
+    
+    - name: Verify GDAL installation
+      shell: msys2 {0}
+      run: |
+        which gdal-config
+        gdal-config --version
+        gdal-config --libs
+        pkg-config --libs gdal
+        ls -la /mingw64/lib/libgdal*
     
     - name: Build
+      shell: msys2 {0}
       run: |
+        export GDAL_HOME=/mingw64
+        export GDAL_LIB_DIR=/mingw64/lib  
+        export GDAL_INCLUDE_DIR=/mingw64/include
+        export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig
+        
+        # Ensure we're using the GNU toolchain
+        export RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu
+        rustup default stable-x86_64-pc-windows-gnu
+        
+        # Verify toolchain
+        rustc --version --verbose
+        
+        # Build the project
         cargo build --release --target x86_64-pc-windows-gnu --verbose
     
     - name: Compress artifacts
+      shell: pwsh
       run: |
         cd target/x86_64-pc-windows-gnu/release
         7z a ../../../raster-calc-windows-x86_64.zip raster-calc.exe
     
     - name: Upload Release Asset
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: raster-calc-windows-x86_64.zip
-        tag_name: ${{ github.event.release.tag_name || github.event.inputs.tag_name }}
-
-  build-arm:
-    name: Build Linux ARM64
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-      
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-      
-    - name: Build ARM64 in Docker
-      run: |
-        # Create Dockerfile for ARM build
-        cat > Dockerfile << 'EOF'
-        FROM arm64v8/rust:slim
-        
-        RUN apt-get update && apt-get install -y \
-            build-essential \
-            libgdal-dev \
-            gdal-bin \
-            pkg-config \
-            libclang-dev \
-            clang
-        
-        WORKDIR /src
-        COPY . .
-        
-        RUN cargo build --release
-        
-        CMD ["cp", "-r", "/src/target/release/raster-calc", "/output/"]
-        EOF
-        
-        # Create output directory
-        mkdir -p output
-        
-        # Build Docker image and run container
-        docker build -t raster-calc-arm-builder --platform linux/arm64 .
-        docker run --platform linux/arm64 --rm -v $(pwd)/output:/output raster-calc-arm-builder
-        
-        # Compress the binary
-        cd output
-        tar czvf ../raster-calc-linux-aarch64.tar.gz raster-calc
-    
-    - name: Upload Release Asset
-      uses: softprops/action-gh-release@v1
-      with:
-        files: raster-calc-linux-aarch64.tar.gz
         tag_name: ${{ github.event.release.tag_name || github.event.inputs.tag_name }}
